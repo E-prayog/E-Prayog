@@ -17,8 +17,8 @@ body,
 
 body {
   font-family: var(--font-body, 'Plus Jakarta Sans', system-ui, sans-serif);
-  background: #070A0F !important;
-  color: var(--text-primary, #E2E8F0);
+  background: #0B1120 !important;
+  color: var(--text-primary, #F1F5F9);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
