@@ -1,311 +1,957 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { RotateCcw, Plus, Trash2, Eye, ZoomIn, Sparkles, Activity, Microscope } from 'lucide-react';
 
-const STAGES = [
+interface MitosisPhaseInfo {
+  name: string;
+  stageKey: 'interphase' | 'prophase' | 'metaphase' | 'anaphase' | 'telophase';
+  durationPct: number; // approximate % of cell cycle
+  color: string;
+  description: string;
+  keyFeatures: string[];
+}
+
+const PHASES: MitosisPhaseInfo[] = [
   {
-    name: 'Interphase', short: 'G2/S', color: '#60a5fa',
-    desc: 'DNA replication complete (S-phase). Cell grows and prepares. Chromatin is diffuse; nucleus clearly visible with nucleolus.',
+    name: 'Interphase (G₁ - S - G₂)',
+    stageKey: 'interphase',
+    durationPct: 75,
+    color: '#60A5FA',
+    description: 'Period of active cell growth, metabolic synthesis, and DNA replication (S-phase).',
+    keyFeatures: ['Intact nuclear envelope with visible nucleolus', 'Diffuse granular chromatin network (uncondensed DNA)', 'Cell prepares enzymes and tubulin for mitosis']
   },
   {
-    name: 'Prophase', short: 'Pro', color: '#a78bfa',
-    desc: 'Chromatin condenses into distinct chromosomes. Nuclear envelope dissolves. Centrioles migrate to poles.',
+    name: 'Prophase',
+    stageKey: 'prophase',
+    durationPct: 12,
+    color: '#A855F7',
+    description: 'Chromatin threads condense and spiral into thick, visible double-stranded chromosomes.',
+    keyFeatures: ['Chromosomes appear as paired sister chromatids joined at centromere', 'Nuclear membrane and nucleolus disintegrate', 'Bipolar spindle apparatus forms from microtubule organizing centers']
   },
   {
-    name: 'Metaphase', short: 'Meta', color: '#f59e0b',
-    desc: 'Chromosomes align at metaphase plate (cell equator). Spindle fibers attach to kinetochores. Maximum condensation.',
+    name: 'Metaphase',
+    stageKey: 'metaphase',
+    durationPct: 5,
+    color: '#F59E0B',
+    description: 'Chromosomes line up along the equatorial plane (metaphase plate) of the cell.',
+    keyFeatures: ['Maximum chromosome condensation (best stage for karyotype analysis)', 'Kinetochore fibers attach centromeres to spindle poles', 'Chromosomes oriented perpendicular to the spindle axis']
   },
   {
-    name: 'Anaphase', short: 'Ana', color: '#ef4444',
-    desc: 'Sister chromatids separate. Kinetochore microtubules shorten, pulling chromatids to opposite poles.',
+    name: 'Anaphase',
+    stageKey: 'anaphase',
+    durationPct: 3,
+    color: '#EF4444',
+    description: 'Centromeres split simultaneously; sister chromatids are pulled apart toward opposite poles.',
+    keyFeatures: ['Chromatids become independent daughter chromosomes', 'Assume characteristic V or L shapes as kinetochores lead migration', 'Shortest and most rapid phase of active mitosis']
   },
   {
-    name: 'Telophase', short: 'Telo', color: '#10b981',
-    desc: 'Nuclear envelopes reform around each set of chromatids. Chromosomes decondense. Cleavage furrow deepens.',
-  },
+    name: 'Telophase & Cytokinesis',
+    stageKey: 'telophase',
+    durationPct: 5,
+    color: '#10B981',
+    description: 'Daughter chromosomes reach spindle poles, decondense, and cell plate divides the cytoplasm.',
+    keyFeatures: ['Nuclear envelopes reconstruct around each chromosome cluster', 'Nucleoli reappear; chromosomes uncoil into chromatin', 'Phragmoplast guides pectin vesicle fusion to form cell plate']
+  }
 ];
 
-const MitosisLab: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stage, setStage] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [intraT, setIntraT] = useState(0); // 0→1 intra-stage animation
-  const rafRef = useRef(0);
-  const tRef = useRef(0);
+interface CellCountRecord {
+  interphase: number;
+  prophase: number;
+  metaphase: number;
+  anaphase: number;
+  telophase: number;
+}
 
+export const MitosisLab: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // States
+  const [activeTab, setActiveTab] = useState<'microscope' | 'cytology'>('microscope');
+  const [selectedPhaseIdx, setSelectedPhaseIdx] = useState<number>(2); // Default to Metaphase
+  const [magnification, setMagnification] = useState<'10x' | '40x' | '100x'>('40x');
+  const [focusLevel, setFocusLevel] = useState<number>(100); // 0 to 100 (100 = crystal clear)
+  const [lightIntensity, setLightIntensity] = useState<number>(85); // %
+
+  // Cell counting tally for Mitotic Index
+  const [cellCounts, setCellCounts] = useState<CellCountRecord>({
+    interphase: 38,
+    prophase: 6,
+    metaphase: 3,
+    anaphase: 2,
+    telophase: 3
+  });
+
+  const totalCells = cellCounts.interphase + cellCounts.prophase + cellCounts.metaphase + cellCounts.anaphase + cellCounts.telophase;
+  const dividingCells = cellCounts.prophase + cellCounts.metaphase + cellCounts.anaphase + cellCounts.telophase;
+  const mitoticIndex = totalCells > 0 ? (dividingCells / totalCells) * 100 : 0;
+
+  const currentPhase = PHASES[selectedPhaseIdx];
+
+  // Increment cell tally
+  const handleIncrement = (phaseKey: keyof CellCountRecord) => {
+    setCellCounts(prev => ({
+      ...prev,
+      [phaseKey]: prev[phaseKey] + 1
+    }));
+  };
+
+  const handleDecrement = (phaseKey: keyof CellCountRecord) => {
+    setCellCounts(prev => ({
+      ...prev,
+      [phaseKey]: Math.max(0, prev[phaseKey] - 1)
+    }));
+  };
+
+  const handleResetCounts = () => {
+    setCellCounts({
+      interphase: 0,
+      prophase: 0,
+      metaphase: 0,
+      anaphase: 0,
+      telophase: 0
+    });
+  };
+
+  // Render Canvas
   useEffect(() => {
-    if (!autoPlay) return;
-    const id = setInterval(() => {
-      setStage(s => (s + 1) % STAGES.length);
-      setIntraT(0); tRef.current = 0;
-    }, 3000);
-    return () => clearInterval(id);
-  }, [autoPlay]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  const draw = useCallback((ts: number) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+    let animId: number;
+    let t = 0;
 
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#06080d'); bg.addColorStop(1, '#04050a');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    const render = () => {
+      t += 0.04;
 
-    const cx = W / 2, cy = H / 2 + 10;
-    const t = tRef.current;
+      const width = canvas.width;
+      const height = canvas.height;
 
-    // Draw cell based on stage
-    const drawCell = () => {
-      // Stage-specific cell shape
-      if (stage === 4) {
-        // Telophase: pinching (two lobes)
-        const pinch = Math.min(0.7, t * 0.8);
-        const lobe = 55 + pinch * 15;
-        const offset = 35 + pinch * 20;
+      // 1. Lab bench background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
 
-        // Two daughter cells
-        for (let side of [-1, 1]) {
-          const scx = cx + side * offset * pinch;
-          // Cell membrane
-          ctx.shadowBlur = 20; ctx.shadowColor = STAGES[stage].color + '60';
-          const cellGrad = ctx.createRadialGradient(scx, cy, 5, scx, cy, lobe);
-          cellGrad.addColorStop(0, 'rgba(16,185,129,0.08)');
-          cellGrad.addColorStop(1, 'rgba(16,185,129,0.02)');
-          ctx.fillStyle = cellGrad;
-          ctx.beginPath(); ctx.ellipse(scx, cy, lobe, lobe * 0.88, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = `rgba(16,185,129,${0.5 + pinch * 0.2})`; ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.ellipse(scx, cy, lobe, lobe * 0.88, 0, 0, Math.PI * 2); ctx.stroke();
-          ctx.shadowBlur = 0;
-
-          // Nuclear envelope reforming
-          const nAlpha = Math.min(0.45, t * 0.5);
-          ctx.strokeStyle = `rgba(96,165,250,${nAlpha})`; ctx.lineWidth = 1.5; ctx.setLineDash([3, 4]);
-          ctx.beginPath(); ctx.ellipse(scx, cy, 28, 24, 0, 0, Math.PI * 2); ctx.stroke();
-          ctx.setLineDash([]);
-
-          // Decondensing chromosomes
-          const chrAlpha = Math.max(0, 0.6 - t * 0.5);
-          ctx.fillStyle = `rgba(167,139,250,${chrAlpha})`;
-          for (let i = 0; i < 5; i++) {
-            const angle = (i / 5) * Math.PI * 2;
-            const cr = 14 + Math.random() * 4;
-            const px = scx + Math.cos(angle) * cr, py = cy + Math.sin(angle) * cr * 0.7;
-            ctx.beginPath(); ctx.ellipse(px, py, 3 + t * 2, 5, angle * 0.3, 0, Math.PI * 2); ctx.fill();
-          }
-
-          // Nucleolus appearing
-          if (t > 0.5) {
-            ctx.fillStyle = `rgba(147,197,253,${(t - 0.5) * 0.6})`;
-            ctx.beginPath(); ctx.arc(scx, cy, 4, 0, Math.PI * 2); ctx.fill();
-          }
-        }
-
-        // Cleavage furrow
-        if (pinch > 0.1) {
-          ctx.strokeStyle = `rgba(16,185,129,${pinch * 0.5})`; ctx.lineWidth = pinch * 6;
-          ctx.beginPath(); ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50); ctx.stroke();
-        }
-
-      } else {
-        // Oval cell for other stages
-        const cellX = 90 + (stage === 3 ? 5 : 0);
-        const cellY = 80;
-
-        ctx.shadowBlur = 25; ctx.shadowColor = STAGES[stage].color + '50';
-        const cGrad = ctx.createRadialGradient(cx, cy, 8, cx, cy, cellX);
-        cGrad.addColorStop(0, `${STAGES[stage].color}0a`);
-        cGrad.addColorStop(0.7, `${STAGES[stage].color}04`);
-        cGrad.addColorStop(1, 'transparent');
-        ctx.fillStyle = cGrad;
-        ctx.beginPath(); ctx.ellipse(cx, cy, cellX, cellY, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = `${STAGES[stage].color}80`; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.ellipse(cx, cy, cellX, cellY, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Cytoplasm texture
-        ctx.fillStyle = 'rgba(96,165,250,0.03)';
-        for (let i = 0; i < 8; i++) {
-          const angle = (i / 8) * Math.PI * 2;
-          ctx.beginPath(); ctx.arc(cx + Math.cos(angle) * 40, cy + Math.sin(angle) * 30, 10, 0, Math.PI * 2); ctx.fill();
-        }
-
-        // ── Nucleus / Chromosomes by stage ──
-        if (stage === 0) {
-          // Interphase: large nucleus with nucleolus
-          const nGrad = ctx.createRadialGradient(cx, cy, 3, cx, cy, 38);
-          nGrad.addColorStop(0, 'rgba(96,165,250,0.2)'); nGrad.addColorStop(1, 'rgba(59,130,246,0.06)');
-          ctx.fillStyle = nGrad;
-          ctx.beginPath(); ctx.arc(cx, cy, 38, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = 'rgba(96,165,250,0.4)'; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
-          ctx.beginPath(); ctx.arc(cx, cy, 38, 0, Math.PI * 2); ctx.stroke();
-          ctx.setLineDash([]);
-          // Nucleolus
-          ctx.fillStyle = 'rgba(147,197,253,0.5)';
-          ctx.beginPath(); ctx.arc(cx - 8, cy + 5, 9, 0, Math.PI * 2); ctx.fill();
-          // Diffuse chromatin
-          ctx.fillStyle = 'rgba(167,139,250,0.2)';
-          for (let i = 0; i < 18; i++) {
-            const a = (i / 18) * Math.PI * 2, r = 8 + (i % 4) * 6;
-            ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2.5, 5, a, 0, Math.PI * 2); ctx.fill();
-          }
-
-        } else if (stage === 1) {
-          // Prophase: condensing chromosomes, aster forming
-          const chAlpha = 0.5 + t * 0.4;
-          // Centrioles & asters
-          const asters = [[-cellX + 20, 0], [cellX - 20, 0]];
-          asters.forEach(([dx]) => {
-            ctx.strokeStyle = `rgba(251,191,36,${0.3 + t * 0.4})`; ctx.lineWidth = 0.8;
-            for (let ai = 0; ai < 8; ai++) {
-              const aa = (ai / 8) * Math.PI * 2;
-              ctx.beginPath(); ctx.moveTo(cx + dx, cy);
-              ctx.lineTo(cx + dx + Math.cos(aa) * 18, cy + Math.sin(aa) * 18); ctx.stroke();
-            }
-            ctx.shadowBlur = 8; ctx.shadowColor = '#fbbf24';
-            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(cx + dx, cy, 4, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
-          });
-          // Condensing chromosomes
-          [[0,-22],[14,-12],[-12,-18],[18,5],[-18,8],[5,20],[-8,18],[16,-22]].forEach(([dx,dy], ci) => {
-            ctx.save(); ctx.translate(cx + dx, cy + dy); ctx.rotate(ci * 0.7);
-            ctx.fillStyle = `rgba(167,139,250,${chAlpha})`;
-            ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 9, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = `rgba(109,40,217,${chAlpha * 0.6})`; ctx.lineWidth = 0.8;
-            ctx.beginPath(); ctx.ellipse(0, 0, 3.5, 9, 0, 0, Math.PI * 2); ctx.stroke();
-            ctx.restore();
-          });
-
-        } else if (stage === 2) {
-          // Metaphase: chromosomes at equator, full spindle
-          const chroms = [-35, -25, -15, -5, 5, 15, 25, 35];
-          // Spindle fibers
-          chroms.forEach(dy => {
-            ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 0.8;
-            ctx.beginPath(); ctx.moveTo(cx - cellX + 18, cy); ctx.lineTo(cx, cy + dy); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx + cellX - 18, cy); ctx.lineTo(cx, cy + dy); ctx.stroke();
-          });
-          // Centrioles
-          [[-cellX + 18, 0], [cellX - 18, 0]].forEach(([dx]) => {
-            ctx.shadowBlur = 12; ctx.shadowColor = '#fbbf24';
-            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(cx + dx, cy, 5, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
-          });
-          // Chromosomes at plate
-          chroms.forEach((dy, ci) => {
-            ctx.save(); ctx.translate(cx, cy + dy);
-            ctx.fillStyle = '#a78bfa';
-            ctx.beginPath(); ctx.ellipse(-4, 0, 3.5, 7, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.ellipse(4, 0, 3.5, 7, 0, 0, Math.PI * 2); ctx.fill();
-            // Centromere
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
-            // Kinetochore
-            ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-cellX + 18 - (-cellX + 18 + cx - cx), -dy); ctx.stroke();
-            ctx.restore();
-          });
-
-        } else if (stage === 3) {
-          // Anaphase: chromatids moving apart
-          const separation = 20 + t * 40;
-          const chroms = [-28, -18, -8, 2, 12, 22, 32];
-
-          // Stretched spindle fibers
-          chroms.forEach(dy => {
-            ctx.strokeStyle = 'rgba(148,163,184,0.2)'; ctx.lineWidth = 0.8;
-            ctx.beginPath(); ctx.moveTo(cx - cellX + 15, cy); ctx.lineTo(cx - separation * 0.5, cy + dy * 0.5); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx + cellX - 15, cy); ctx.lineTo(cx + separation * 0.5, cy + dy * 0.5); ctx.stroke();
-          });
-
-          // Two groups moving apart
-          for (const side of [-1, 1]) {
-            const gx = cx + side * separation * 0.5;
-            chroms.forEach((dy, ci) => {
-              ctx.save(); ctx.translate(gx, cy + dy * 0.55);
-              ctx.fillStyle = '#a78bfa';
-              ctx.beginPath(); ctx.ellipse(0, 0, 3, 7, 0, 0, Math.PI * 2); ctx.fill();
-              ctx.strokeStyle = 'rgba(109,40,217,0.5)'; ctx.lineWidth = 0.7;
-              ctx.beginPath(); ctx.ellipse(0, 0, 3, 7, 0, 0, Math.PI * 2); ctx.stroke();
-              ctx.restore();
-            });
-            // Centrioles at poles
-            ctx.shadowBlur = 10; ctx.shadowColor = '#ef4444';
-            ctx.fillStyle = '#ef4444';
-            ctx.beginPath(); ctx.arc(cx + side * (cellX - 14), cy, 5, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
-          }
-
-          // Stretching cell membrane hint
-          ctx.strokeStyle = 'rgba(239,68,68,0.2)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
-          ctx.beginPath(); ctx.moveTo(cx, cy - cellY + 10); ctx.lineTo(cx, cy + cellY - 10); ctx.stroke();
-          ctx.setLineDash([]);
+      // Dot grid
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.035)';
+      const dotSpacing = 24;
+      for (let x = 0; x < width; x += dotSpacing) {
+        for (let y = 0; y < height; y += dotSpacing) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
+
+      const benchGrad = ctx.createLinearGradient(0, 0, 0, height);
+      benchGrad.addColorStop(0, 'rgba(248, 250, 252, 0.6)');
+      benchGrad.addColorStop(1, 'rgba(241, 245, 249, 0.9)');
+      ctx.fillStyle = benchGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      if (activeTab === 'microscope') {
+        // --- MICROSCOPE FIELD OF VIEW ---
+        const fovCenterX = width * 0.42;
+        const fovCenterY = height / 2;
+        const fovRadius = 135;
+
+        // Microscope Stage Collar Frame (Black Matte Metal)
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.2)';
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 6;
+        ctx.fillStyle = '#1E293B';
+        ctx.beginPath();
+        ctx.arc(fovCenterX, fovCenterY, fovRadius + 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Inner Brass Retaining Ring
+        ctx.strokeStyle = '#D97706';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(fovCenterX, fovCenterY, fovRadius + 3, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Optical Field Circular Clip
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(fovCenterX, fovCenterY, fovRadius, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Substage Condenser Light Illumination (Warm tinted microscope field)
+        const lightRatio = lightIntensity / 100;
+        const lightGrad = ctx.createRadialGradient(
+          fovCenterX, fovCenterY, 10,
+          fovCenterX, fovCenterY, fovRadius
+        );
+        lightGrad.addColorStop(0, `rgba(255, 252, 240, ${0.9 * lightRatio})`);
+        lightGrad.addColorStop(0.7, `rgba(254, 243, 199, ${0.75 * lightRatio})`);
+        lightGrad.addColorStop(1, `rgba(217, 119, 6, ${0.35 * lightRatio})`);
+        ctx.fillStyle = lightGrad;
+        ctx.fillRect(fovCenterX - fovRadius, fovCenterY - fovRadius, fovRadius * 2, fovRadius * 2);
+
+        // Realistic Focal Plane Depth-of-Field Blur
+        const defocusBlur = Math.abs(100 - focusLevel) * 0.12;
+        ctx.filter = defocusBlur > 0.5 ? `blur(${defocusBlur.toFixed(1)}px)` : 'none';
+
+        // Draw Onion Root Tip Meristematic Cells Smear
+        // Acetocarmine Stained Cells Grid
+        const cellCols = magnification === '10x' ? 8 : magnification === '40x' ? 5 : 3;
+        const cellRows = magnification === '10x' ? 8 : magnification === '40x' ? 5 : 3;
+        const cellW = (fovRadius * 2.2) / cellCols;
+        const cellH = (fovRadius * 2.2) / cellRows;
+
+        for (let c = -cellCols / 2; c <= cellCols / 2; c++) {
+          for (let r = -cellRows / 2; r <= cellRows / 2; r++) {
+            const cx = fovCenterX + c * cellW;
+            const cy = fovCenterY + r * cellH;
+
+            // Seeded deterministic phase assignment for smear realism
+            const hash = Math.abs(Math.sin(c * 37.1 + r * 91.7)) * 100;
+            let cellPhase: 'interphase' | 'prophase' | 'metaphase' | 'anaphase' | 'telophase' = 'interphase';
+
+            if (hash < 68) cellPhase = 'interphase';
+            else if (hash < 80) cellPhase = 'prophase';
+            else if (hash < 89) cellPhase = 'metaphase';
+            else if (hash < 94) cellPhase = 'anaphase';
+            else cellPhase = 'telophase';
+
+            // Plant Cell Wall (Rectangular/Hexagonal with rounded corners)
+            ctx.strokeStyle = 'rgba(180, 83, 9, 0.4)';
+            ctx.lineWidth = 1.2;
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.25)';
+            ctx.beginPath();
+            ctx.roundRect(cx - cellW * 0.46, cy - cellH * 0.44, cellW * 0.92, cellH * 0.88, 3);
+            ctx.fill();
+            ctx.stroke();
+
+            // Cytoplasm pale eosin/acetocarmine background
+            ctx.fillStyle = 'rgba(244, 114, 182, 0.15)';
+            ctx.fill();
+
+            // Nucleus / Chromosomes based on phase (Acetocarmine deep purple-red #9333EA / #831843)
+            ctx.fillStyle = '#831843';
+            ctx.strokeStyle = '#500724';
+
+            if (cellPhase === 'interphase') {
+              // Intact round nucleus with nucleolus
+              ctx.beginPath();
+              ctx.arc(cx, cy, cellW * 0.22, 0, Math.PI * 2);
+              ctx.fill();
+              // Darker nucleolus dot
+              ctx.fillStyle = '#4C0519';
+              ctx.beginPath();
+              ctx.arc(cx + cellW * 0.05, cy - cellH * 0.05, cellW * 0.07, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (cellPhase === 'prophase') {
+              // Tangled condensed chromatin threads
+              ctx.strokeStyle = '#831843';
+              ctx.lineWidth = 1.8;
+              for (let line = 0; line < 5; line++) {
+                ctx.beginPath();
+                ctx.arc(cx + (line - 2) * 2, cy, cellW * 0.18, line * 0.6, line * 0.6 + 2.5);
+                ctx.stroke();
+              }
+            } else if (cellPhase === 'metaphase') {
+              // Condensed chromosomes aligned tightly on equatorial line
+              ctx.fillStyle = '#831843';
+              for (let chrom = -2; chrom <= 2; chrom++) {
+                ctx.fillRect(cx - cellW * 0.06, cy + chrom * (cellH * 0.09) - 3, cellW * 0.12, 6);
+              }
+            } else if (cellPhase === 'anaphase') {
+              // Two separate clusters of V-shaped chromatids moving to poles
+              ctx.fillStyle = '#831843';
+              [-1, 1].forEach(pole => {
+                const px = cx + pole * (cellW * 0.18);
+                ctx.beginPath();
+                ctx.moveTo(px, cy - cellH * 0.15);
+                ctx.lineTo(px + pole * 4, cy);
+                ctx.lineTo(px, cy + cellH * 0.15);
+                ctx.fill();
+              });
+            } else if (cellPhase === 'telophase') {
+              // Two reforming nuclei at opposite poles with central cell plate line
+              [-1, 1].forEach(pole => {
+                ctx.beginPath();
+                ctx.arc(cx + pole * (cellW * 0.22), cy, cellW * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+              });
+              // Faint cell plate forming
+              ctx.strokeStyle = '#D97706';
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(cx, cy - cellH * 0.35);
+              ctx.lineTo(cx, cy + cellH * 0.35);
+              ctx.stroke();
+            }
+          }
+        }
+
+        ctx.filter = 'none'; // reset filter
+        ctx.restore(); // restore clipping
+
+        // Eyepiece crosshairs & Scale Bar in Field of View
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.lineWidth = 0.75;
+        ctx.beginPath();
+        ctx.moveTo(fovCenterX - 15, fovCenterY);
+        ctx.lineTo(fovCenterX + 15, fovCenterY);
+        ctx.moveTo(fovCenterX, fovCenterY - 15);
+        ctx.lineTo(fovCenterX, fovCenterY + 15);
+        ctx.stroke();
+
+        // Micron Scale Bar in Microscope View
+        const scaleBarW = magnification === '10x' ? 50 : magnification === '40x' ? 80 : 120;
+        const scaleBarY = fovCenterY + fovRadius - 20;
+        ctx.strokeStyle = '#0F172A';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(fovCenterX - scaleBarW / 2, scaleBarY);
+        ctx.lineTo(fovCenterX + scaleBarW / 2, scaleBarY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(magnification === '10x' ? '100 µm' : magnification === '40x' ? '25 µm' : '10 µm', fovCenterX, scaleBarY - 4);
+
+        // Microscope Controls & Readouts on the Right Side
+        const panelX = width * 0.72;
+        const panelY = 40;
+        const panelW = 200;
+
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.roundRect(panelX, panelY, panelW, 230, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Header
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText('OPTICAL SPECIFICATIONS', panelX + 14, panelY + 22);
+
+        // Info List
+        const items = [
+          { label: 'Specimen', val: 'Onion Root Tip (Allium cepa)' },
+          { label: 'Stain', val: 'Acetocarmine / 1N HCl' },
+          { label: 'Magnification', val: magnification },
+          { label: 'Field Quality', val: focusLevel > 90 ? 'Crisp (Focused)' : 'Blurred (Adjust Focus)' },
+          { label: 'Illumination', val: `${lightIntensity}% LED` }
+        ];
+
+        items.forEach((item, idx) => {
+          const iy = panelY + 48 + idx * 34;
+          ctx.fillStyle = '#64748B';
+          ctx.font = '9px system-ui';
+          ctx.fillText(item.label, panelX + 14, iy);
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 10px system-ui';
+          ctx.fillText(item.val, panelX + 14, iy + 14);
+        });
+        ctx.restore();
+
+      } else {
+        // --- CYTOLOGY HIGH-RES CELL EXPLORER ---
+        const cellCenterX = width * 0.42;
+        const cellCenterY = height / 2;
+        const cellRadius = 120;
+
+        // Large High-Res Plant Cell
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+
+        // Plant Cell Wall (Pectin & Cellulose double border)
+        ctx.strokeStyle = '#D97706';
+        ctx.lineWidth = 6;
+        ctx.fillStyle = 'rgba(254, 249, 195, 0.4)';
+        ctx.beginPath();
+        ctx.roundRect(cellCenterX - 180, cellCenterY - cellRadius, 360, cellRadius * 2, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner Plasma Membrane
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(cellCenterX - 176, cellCenterY - cellRadius + 4, 352, cellRadius * 2 - 8, 14);
+        ctx.stroke();
+
+        // Cytoplasm with organelles
+        ctx.fillStyle = 'rgba(244, 114, 182, 0.12)';
+        ctx.fill();
+        ctx.restore();
+
+        // Draw Stage-Specific Chromosome Architecture
+        const phase = currentPhase.stageKey;
+
+        if (phase === 'interphase') {
+          // Intact Nuclear Membrane
+          ctx.strokeStyle = '#8B5CF6';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([4, 2]);
+          ctx.beginPath();
+          ctx.arc(cellCenterX, cellCenterY, 65, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Nucleoplasm
+          ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+          ctx.fill();
+
+          // Dense Nucleolus
+          ctx.fillStyle = '#4C0519';
+          ctx.beginPath();
+          ctx.arc(cellCenterX - 18, cellCenterY - 14, 14, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Diffuse Chromatin Network
+          ctx.strokeStyle = '#831843';
+          ctx.lineWidth = 1.2;
+          for (let w = 0; w < 12; w++) {
+            ctx.beginPath();
+            ctx.arc(cellCenterX + Math.sin(w) * 25, cellCenterY + Math.cos(w) * 25, 20, w, w + 1.8);
+            ctx.stroke();
+          }
+
+          // Label
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('Diffuse Chromatin & Intact Nucleolus', cellCenterX, cellCenterY + 85);
+
+        } else if (phase === 'prophase') {
+          // Dissolving Nuclear Envelope (dashed fragmenting circle)
+          ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.arc(cellCenterX, cellCenterY, 70, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Thick Condensed Chromosomes (4 pairs of sister chromatids)
+          ctx.fillStyle = '#831843';
+          ctx.strokeStyle = '#4C0519';
+          ctx.lineWidth = 2;
+
+          for (let p = 0; p < 6; p++) {
+            const angle = (p / 6) * Math.PI * 2 + 0.3;
+            const px = cellCenterX + Math.cos(angle) * 35;
+            const py = cellCenterY + Math.sin(angle) * 35;
+
+            // X-shaped double chromatid chromosome
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(-14, -14); ctx.lineTo(14, 14);
+            ctx.moveTo(14, -14); ctx.lineTo(-14, 14);
+            ctx.stroke();
+            // Centromere dot
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('Condensing Chromosomes (Sister Chromatids)', cellCenterX, cellCenterY + 95);
+
+        } else if (phase === 'metaphase') {
+          // Spindle Poles at Left and Right
+          const poleL = cellCenterX - 130;
+          const poleR = cellCenterX + 130;
+
+          // Spindle Fibers converging from poles to equator
+          ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
+          ctx.lineWidth = 1.2;
+
+          for (let f = -3; f <= 3; f++) {
+            const eqY = cellCenterY + f * 22;
+            ctx.beginPath();
+            ctx.moveTo(poleL, cellCenterY);
+            ctx.lineTo(cellCenterX, eqY);
+            ctx.lineTo(poleR, cellCenterY);
+            ctx.stroke();
+          }
+
+          // Equatorial Metaphase Plate (Vertical line of chromosomes)
+          ctx.strokeStyle = '#D97706';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(cellCenterX, cellCenterY - 80);
+          ctx.lineTo(cellCenterX, cellCenterY + 80);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // 5 Chromosomes aligned along equatorial plate
+          for (let c = -2; c <= 2; c++) {
+            const cy = cellCenterY + c * 26;
+            ctx.fillStyle = '#831843';
+            ctx.strokeStyle = '#4C0519';
+            ctx.lineWidth = 2.5;
+
+            ctx.save();
+            ctx.translate(cellCenterX, cy);
+            // Chromosome arms oriented along plate
+            ctx.beginPath();
+            ctx.moveTo(-16, -4); ctx.lineTo(16, -4);
+            ctx.moveTo(-16, 4); ctx.lineTo(16, 4);
+            ctx.stroke();
+            // Kinetochore / Centromere
+            ctx.fillStyle = '#0284C7';
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('Equatorial Alignment on Metaphase Plate', cellCenterX, cellCenterY + 95);
+
+        } else if (phase === 'anaphase') {
+          const poleL = cellCenterX - 130;
+          const poleR = cellCenterX + 130;
+
+          // Shortened Kinetochore Spindle Microtubules
+          ctx.strokeStyle = 'rgba(14, 165, 233, 0.45)';
+          ctx.lineWidth = 1.2;
+
+          for (let f = -2; f <= 2; f++) {
+            const cy = cellCenterY + f * 24;
+            // Left fibers
+            ctx.beginPath();
+            ctx.moveTo(poleL, cellCenterY);
+            ctx.lineTo(cellCenterX - 55, cy);
+            ctx.stroke();
+            // Right fibers
+            ctx.beginPath();
+            ctx.moveTo(poleR, cellCenterY);
+            ctx.lineTo(cellCenterX + 55, cy);
+            ctx.stroke();
+          }
+
+          // V-shaped Daughter Chromatids migrating towards poles
+          ctx.strokeStyle = '#831843';
+          ctx.lineWidth = 3;
+
+          for (let c = -2; c <= 2; c++) {
+            const cy = cellCenterY + c * 24;
+
+            // Moving Left (V pointing toward Left pole)
+            ctx.beginPath();
+            ctx.moveTo(cellCenterX - 42, cy - 10);
+            ctx.lineTo(cellCenterX - 58, cy);
+            ctx.lineTo(cellCenterX - 42, cy + 10);
+            ctx.stroke();
+
+            // Moving Right (V pointing toward Right pole)
+            ctx.beginPath();
+            ctx.moveTo(cellCenterX + 42, cy - 10);
+            ctx.lineTo(cellCenterX + 58, cy);
+            ctx.lineTo(cellCenterX + 42, cy + 10);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('Centromeres Split: Chromatids Move to Opposite Poles', cellCenterX, cellCenterY + 95);
+
+        } else if (phase === 'telophase') {
+          // Two Reforming Nuclear Envelopes
+          [-1, 1].forEach(pole => {
+            const nx = cellCenterX + pole * 85;
+            ctx.strokeStyle = '#8B5CF6';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 2]);
+            ctx.beginPath();
+            ctx.arc(nx, cellCenterY, 38, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Decondensing Chromatin threads
+            ctx.strokeStyle = '#831843';
+            ctx.lineWidth = 1.2;
+            for (let tLine = 0; tLine < 5; tLine++) {
+              ctx.beginPath();
+              ctx.arc(nx, cellCenterY, 18, tLine, tLine + 1.5);
+              ctx.stroke();
+            }
+          });
+
+          // Cell Plate Formation (Phragmoplast vesicles fusing at equator)
+          ctx.strokeStyle = '#D97706';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cellCenterX, cellCenterY - 80);
+          ctx.lineTo(cellCenterX, cellCenterY + 80);
+          ctx.stroke();
+
+          // Pectin droplets along cell plate
+          for (let pY = cellCenterY - 70; pY <= cellCenterY + 70; pY += 15) {
+            ctx.fillStyle = '#F59E0B';
+            ctx.beginPath();
+            ctx.arc(cellCenterX, pY, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 11px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('Cell Plate (Phragmoplast) & Nuclear Reconstitution', cellCenterX, cellCenterY + 95);
+        }
+
+        // Details Panel on Right
+        const panelX = width * 0.72;
+        const panelY = 40;
+        const panelW = 200;
+
+        ctx.save();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.roundRect(panelX, panelY, panelW, 230, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = currentPhase.color;
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(currentPhase.name.toUpperCase(), panelX + 14, panelY + 22);
+
+        ctx.fillStyle = '#64748B';
+        ctx.font = '9px system-ui';
+        ctx.fillText(`Duration: ~${currentPhase.durationPct}% of cycle`, panelX + 14, panelY + 36);
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 9px system-ui';
+        ctx.fillText('Diagnostic Cytological Features:', panelX + 14, panelY + 58);
+
+        currentPhase.keyFeatures.forEach((feat, idx) => {
+          ctx.fillStyle = '#475569';
+          ctx.font = '8.5px system-ui';
+          const fy = panelY + 76 + idx * 45;
+          ctx.fillText(`• ${feat.slice(0, 30)}`, panelX + 14, fy);
+          if (feat.length > 30) {
+            ctx.fillText(`  ${feat.slice(30)}`, panelX + 14, fy + 12);
+          }
+        });
+        ctx.restore();
+      }
+
+      animId = requestAnimationFrame(render);
     };
 
-    drawCell();
-
-    // ── Scale bar & labels ──
-    ctx.fillStyle = STAGES[stage].color; ctx.font = 'bold 14px Inter'; ctx.textAlign = 'center';
-    ctx.shadowBlur = 10; ctx.shadowColor = STAGES[stage].color;
-    ctx.fillText(STAGES[stage].name, cx, 35);
-    ctx.shadowBlur = 0;
-    // Scale bar
-    ctx.strokeStyle = 'rgba(100,116,139,0.5)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(W - 60, H - 20); ctx.lineTo(W - 20, H - 20); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W - 60, H - 23); ctx.lineTo(W - 60, H - 17); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W - 20, H - 23); ctx.lineTo(W - 20, H - 17); ctx.stroke();
-    ctx.fillStyle = 'rgba(100,116,139,0.6)'; ctx.font = '8px Inter';
-    ctx.fillText('10 µm', W - 40, H - 8);
-
-    tRef.current = Math.min(1, tRef.current + 0.008);
-    setIntraT(tRef.current);
-    rafRef.current = requestAnimationFrame(draw);
-  }, [stage]);
-
-  useEffect(() => {
-    tRef.current = 0; setIntraT(0);
-    rafRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [draw]);
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
+  }, [activeTab, selectedPhaseIdx, magnification, focusLevel, lightIntensity, currentPhase]);
 
   return (
-    <div className="flex flex-col h-full gap-0" style={{ background: 'linear-gradient(160deg,#06080f,#080a14)', borderRadius: '12px', overflow: 'hidden' }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(34,197,94,0.2)', background: 'rgba(6,8,15,0.9)' }}>
+    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto p-4 select-none">
+      {/* Simulation Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h3 className="text-sm font-semibold text-white tracking-wide">🔬 Mitosis: Cell Division Stages</h3>
-          <p className="text-[10px] text-zinc-500 mt-0.5">Somatic cell division · Chromosome behaviour · Equational division</p>
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-sky-500" />
+            Mitosis in Onion Root Tip Cells (Allium Cepa)
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Observe and identify the 5 stages of mitosis in meristematic root cells, calculate the <span className="font-semibold text-slate-700">Mitotic Index (MI)</span>, and study chromosomal dynamics.
+          </p>
         </div>
-        <button onClick={() => setAutoPlay(p => !p)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold"
-          style={{ background: autoPlay ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: autoPlay ? '#f87171' : '#4ade80', border: `1px solid ${autoPlay ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
-          {autoPlay ? '⏸ Pause' : '▶ Auto'}
-        </button>
+
+        {/* View Mode Switcher */}
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+          <button
+            onClick={() => setActiveTab('microscope')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              activeTab === 'microscope' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Microscope className="w-3.5 h-3.5" />
+            Microscope Field View
+          </button>
+          <button
+            onClick={() => setActiveTab('cytology')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              activeTab === 'cytology' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            High-Res Stage Cytology
+          </button>
+        </div>
       </div>
 
-      <canvas ref={canvasRef} width={440} height={310} className="w-full" style={{ display: 'block' }} />
+      {/* Main Simulation Stage Canvas */}
+      <div className="relative bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden flex flex-col items-center">
+        <canvas
+          ref={canvasRef}
+          width={900}
+          height={320}
+          className="w-full h-auto"
+        />
 
-      <div className="px-4 py-3 flex flex-col gap-3 border-t" style={{ borderColor: 'rgba(34,197,94,0.12)', background: 'rgba(5,7,12,0.97)' }}>
-        <div className="flex gap-1">
-          {STAGES.map((st, i) => (
-            <button key={st.name} onClick={() => { setStage(i); tRef.current = 0; setAutoPlay(false); }}
-              className="flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all"
-              style={{ background: i === stage ? st.color + '25' : 'rgba(255,255,255,0.04)', color: i === stage ? st.color : '#475569', border: `1px solid ${i === stage ? st.color + '50' : 'rgba(255,255,255,0.07)'}` }}>
-              {st.short}
+        {/* Action Controls Bar */}
+        <div className="w-full bg-slate-50 border-t border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+          {activeTab === 'microscope' ? (
+            <>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="font-semibold text-slate-500">Objective:</span>
+                {(['10x', '40x', '100x'] as const).map(mag => (
+                  <button
+                    key={mag}
+                    onClick={() => setMagnification(mag)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      magnification === mag
+                        ? 'bg-sky-500 text-white shadow-sm'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {mag}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setFocusLevel(100)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition"
+                >
+                  Auto-Fine Focus (100%)
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 overflow-x-auto w-full">
+              <span className="text-xs font-semibold text-slate-500 shrink-0 mr-2">Mitotic Phase:</span>
+              {PHASES.map((p, idx) => (
+                <button
+                  key={p.name}
+                  onClick={() => setSelectedPhaseIdx(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                    selectedPhaseIdx === idx
+                      ? 'bg-sky-500 text-white shadow-sm'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {p.name.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Interactive Controls & Parameters */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Card 1: Focus Knob Adjustment */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Fine Focus Knob
+              </label>
+              <span className="text-sm font-bold font-mono text-sky-600">{focusLevel}%</span>
+            </div>
+
+            <input
+              type="range"
+              min="20"
+              max="100"
+              step="5"
+              value={focusLevel}
+              onChange={e => setFocusLevel(parseInt(e.target.value))}
+              className="w-full accent-sky-500 cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>Coarse</span>
+              <span>Sub-optimal</span>
+              <span>Sharp Focus</span>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Optics Status:</span>
+            <span className={`font-bold ${focusLevel >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {focusLevel >= 95 ? '✓ Crisp Focus' : 'Blurry (Adjust)'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Light Illumination */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Condenser Diaphragm
+              </label>
+              <span className="text-sm font-bold font-mono text-slate-800">{lightIntensity}%</span>
+            </div>
+
+            <input
+              type="range"
+              min="30"
+              max="100"
+              step="5"
+              value={lightIntensity}
+              onChange={e => setLightIntensity(parseInt(e.target.value))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>Dim</span>
+              <span>Optimal</span>
+              <span>Bright</span>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Stain Contrast:</span>
+            <span className="font-semibold text-slate-800">Acetocarmine</span>
+          </div>
+        </div>
+
+        {/* Card 3: Mitotic Index (MI) Calculator */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mitotic Index (MI)</span>
+              <span className="text-base font-mono font-bold text-indigo-600">{mitoticIndex.toFixed(1)}%</span>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {dividingCells} dividing cells / {totalCells} total counted
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">Standard Root MI:</span>
+            <span className="font-mono font-bold text-emerald-600">15% &ndash; 25%</span>
+          </div>
+        </div>
+
+        {/* Card 4: Action / Reset Tally */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+              Cell Counter Controls
+            </span>
+            <div className="text-[11px] text-slate-500">
+              Tally cells in the table below to calculate Mitotic Index
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <button
+              onClick={handleResetCounts}
+              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-1.5 transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Cell Counts
             </button>
-          ))}
+          </div>
         </div>
-        <div className="rounded-xl p-3 text-[10px] text-zinc-400" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${STAGES[stage].color}25` }}>
-          <span className="font-bold" style={{ color: STAGES[stage].color }}>{STAGES[stage].name}: </span>{STAGES[stage].desc}
+      </div>
+
+      {/* Observation Table: Cell Counter & Mitotic Index Table */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Observation Table: Cell Stage Frequencies</h3>
+            <p className="text-xs text-slate-500">
+              Count cells in each mitotic stage across the field of view to compute <span className="font-semibold text-slate-700">Mitotic Index = (Dividing Cells / Total Cells) &times; 100%</span>
+            </p>
+          </div>
         </div>
-        {/* Intra-stage progress */}
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] text-zinc-500 whitespace-nowrap">Stage progress</span>
-          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-            <div className="h-full rounded-full transition-all duration-100" style={{ width: `${intraT * 100}%`, background: STAGES[stage].color }} />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                <th className="py-2.5 px-3">Stage of Cell Division</th>
+                <th className="py-2.5 px-3">Distinct Cytological Features</th>
+                <th className="py-2.5 px-3">Number of Cells Counted</th>
+                <th className="py-2.5 px-3">Quick Tally Controls</th>
+                <th className="py-2.5 px-3">Stage Percentage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {PHASES.map(p => {
+                const count = cellCounts[p.stageKey];
+                const pct = totalCells > 0 ? ((count / totalCells) * 100).toFixed(1) : '0.0';
+                return (
+                  <tr key={p.stageKey} className="hover:bg-slate-50/80 transition">
+                    <td className="py-2.5 px-3 font-semibold text-slate-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }}></span>
+                      {p.name}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-600 max-w-xs">{p.keyFeatures[0]}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-900 text-sm">{count}</td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDecrement(p.stageKey)}
+                          className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition"
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => handleIncrement(p.stageKey)}
+                          className="w-6 h-6 rounded bg-sky-500 hover:bg-sky-600 text-white font-bold flex items-center justify-center transition"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">{pct}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50/90 font-bold border-t border-slate-200 text-slate-900">
+                <td className="py-2.5 px-3" colSpan={2}>
+                  Total Cells Counted: {totalCells} (Dividing: {dividingCells})
+                </td>
+                <td className="py-2.5 px-3 font-mono text-indigo-700" colSpan={3}>
+                  Calculated Mitotic Index (MI) = {mitoticIndex.toFixed(1)}%
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Theoretical Summary */}
+        <div className="mt-5 p-4 rounded-xl bg-sky-50/70 border border-sky-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-sky-950">
+          <div>
+            <div className="font-bold text-sky-900 mb-0.5">Key Biological Principles:</div>
+            <ul className="list-disc list-inside text-sky-800 space-y-0.5">
+              <li><strong>Meristematic Zone:</strong> Onion root tip apical meristem contains rapidly proliferating diploid cells (2n = 16).</li>
+              <li><strong>Mitotic Index Formula:</strong> MI = (P + M + A + T) / (Total Cells) &times; 100%.</li>
+              <li><strong>Fixation &amp; Hydrolysis:</strong> Warm 1N HCl hydrolyzes middle lamella pectin for single-layer squashing.</li>
+            </ul>
+          </div>
+          <div className="bg-white px-4 py-3 rounded-lg border border-sky-200 text-center shrink-0">
+            <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Mitotic Index</div>
+            <div className="font-mono font-bold text-sm text-sky-600 mt-0.5">MI = (Dividing / Total) &times; 100%</div>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 export default MitosisLab;
