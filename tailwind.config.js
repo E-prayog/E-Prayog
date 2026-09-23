@@ -17,69 +17,40 @@ export default {
         mono:    ['JetBrains Mono', 'monospace'],
       },
       colors: {
-        /* ── Obsidian Canvas System ── */
-        canvas:  '#070A0F',
-        surface: '#0D1117',
-        card:    '#121824',
-        elevated:'#1A2233',
-        glass: {
-          100: 'rgba(18, 24, 36, 0.40)',
-          200: 'rgba(18, 24, 36, 0.65)',
-          300: 'rgba(18, 24, 36, 0.85)',
+        /* ── Lightweight Restrained Color System ── */
+        canvas:  '#0B1120',
+        surface: '#131B2E',
+        card:    '#131B2E',
+        elevated:'#1A243B',
+        accent: {
+          DEFAULT: '#38BDF8',
+          hover:   '#0EA5E9',
+          soft:    'rgba(56, 189, 248, 0.20)',
         },
-        /* ── Lab Cyan Accent (Primary) ── */
-        lab: {
-          cyan:    '#06B6D4',
-          bright:  '#22D3EE',
-          muted:   '#0891B2',
-          dim:     '#164E63',
-          glow:    'rgba(6, 182, 212, 0.35)',
+        border: {
+          DEFAULT: '#1E293B',
+          subtle:  'rgba(30, 41, 59, 0.50)',
         },
-        /* ── Tactical Amber (Rare Secondary) ── */
-        tactical: {
-          DEFAULT: '#F59E0B',
-          light:   '#FBBF24',
-          dark:    '#D97706',
-        },
-        /* ── Neutrals ── */
+        /* ── Text Tokens ── */
         slate: {
-          950: '#070A0F',
-          900: '#0D1117',
-          850: '#121824',
-          800: '#1A2233',
-          700: '#253347',
-          600: '#334155',
-          500: '#475569',
+          950: '#0B1120',
+          900: '#131B2E',
+          800: '#1E293B',
+          700: '#334155',
+          600: '#64748B',
+          500: '#64748B',
           400: '#94A3B8',
           300: '#CBD5E1',
           200: '#E2E8F0',
+          100: '#F1F5F9',
         },
-        /* ── Legacy brand tokens (preserved for non-home pages) ── */
-        sky: {
-          accent: '#06B6D4',
-          light:  '#22D3EE',
-          muted:  '#0891B2',
-          dim:    '#164E63',
-        },
-        gold: {
-          DEFAULT: '#F59E0B',
-          light:   '#FBBF24',
-          dark:    '#D97706',
-        },
-        brand: {
-          50:  '#E8F4FD',
-          100: '#C5DFF5',
-          200: '#06B6D4',
-          500: '#0891B2',
-          600: '#0E7490',
-          900: '#070A0F',
-        },
+        /* ── Subject accents (flat) ── */
         subject: {
-          physics:   '#5BA3D4',
-          chemistry: '#F5A623',
-          biology:   '#5BB887',
-          math:      '#A78BFA',
-          cs:        '#60C4D4',
+          physics:   '#38BDF8',
+          chemistry: '#38BDF8',
+          biology:   '#38BDF8',
+          math:      '#38BDF8',
+          cs:        '#38BDF8',
         }
       },
       animation: {

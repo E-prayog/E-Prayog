@@ -45,7 +45,7 @@ const BioDiagrams = lazy(() => import('./pages/tools/BioDiagrams'));
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
-      <div className="size-12 border-3 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+      <div className="size-12 rounded-full animate-spin" style={{ border: '3px solid rgba(56,189,248,0.15)', borderTopColor: '#38BDF8' }} />
       <p className="text-sm text-zinc-500 font-medium">Loading E-Prayog...</p>
     </div>
   </div>
