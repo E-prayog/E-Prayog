@@ -25,55 +25,39 @@
     @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
     /* ── Design Tokens ── */
+    /* ── Design Tokens: Restrained Color System ── */
     :root {
-      /* Backgrounds — layered obsidian depth */
-      --bg-canvas:       #070A0F;
-      --bg-surface:      #0D1117;
-      --bg-card:         #121824;
-      --bg-floating:     #1A2233;
-      --bg-base:         #070A0F;
-
-      /* Primary Accent: Lab Cyan */
-      --accent-primary:  #06B6D4;
-      --accent-bright:   #22D3EE;
-      --accent-muted:    #0891B2;
-      --accent-glow:     rgba(6, 182, 212, 0.25);
-
-      /* Secondary Accent: Tactical Amber (rare, intentional) */
-      --accent-second:   #F59E0B;
-      --accent-second-light: #FBBF24;
+      /* Backgrounds */
+      --bg-primary:      #0B1120;
+      --bg-surface:      #131B2E;
+      --bg-canvas:       #0B1120;
+      --bg-card:         #131B2E;
+      --bg-base:         #0B1120;
 
       /* Text */
-      --text-primary:    #E2E8F0;
+      --text-primary:    #F1F5F9;
       --text-secondary:  #94A3B8;
-      --text-muted:      #475569;
-      --text-color:      #E2E8F0;
+      --text-tertiary:   #64748B;
+      --text-muted:      #64748B;
+      --text-color:      #F1F5F9;
 
-      /* Borders — hairline precision */
-      --border-subtle:   rgba(226, 232, 240, 0.06);
-      --border-default:  rgba(226, 232, 240, 0.10);
-      --border-strong:   rgba(6, 182, 212, 0.25);
-      --glass-border:    rgba(226, 232, 240, 0.08);
-      --glass-bg:        rgba(18, 24, 36, 0.70);
-      --nav-bg:          rgba(7, 10, 15, 0.80);
+      /* Accent — Single Sky Blue Family (Used Flat) */
+      --accent:          #38BDF8;
+      --accent-hover:    #0EA5E9;
+      --accent-soft:     rgba(56, 189, 248, 0.20);
+      --accent-primary:  #38BDF8;
+      --accent-bright:   #38BDF8;
+      --accent-muted:    #0EA5E9;
 
-      /* Subject accents — preserved */
-      --subject-physics:     #5BA3D4;
-      --subject-chemistry:   #F5A623;
-      --subject-biology:     #5BB887;
-      --subject-math:        #A78BFA;
-      --subject-cs:          #60C4D4;
+      /* Borders / Dividers */
+      --border:          #1E293B;
+      --border-subtle:   #1E293B;
+      --border-default:  #1E293B;
 
       /* Typography */
       --font-display:    'Sora', system-ui, sans-serif;
       --font-body:       'Plus Jakarta Sans', system-ui, sans-serif;
       --font-mono:       'JetBrains Mono', monospace;
-
-      /* Spacing scale (4px base) */
-      --space-1:   4px;  --space-2:   8px;  --space-3:  12px;
-      --space-4:  16px;  --space-5:  24px;  --space-6:  32px;
-      --space-7:  48px;  --space-8:  64px;  --space-9:  96px;
-      --space-10: 128px;
 
       /* Border radius */
       --radius-sm:    4px;
@@ -83,19 +67,17 @@
       --radius-2xl:  32px;
       --radius-full: 999px;
 
-      /* Easing tokens — slow, physical, purposeful */
+      /* Easing tokens */
       --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
       --ease-in-out:    cubic-bezier(0.4, 0, 0.2, 1);
-      --ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .dark {
-      --bg-base:      #070A0F;
-      --text-color:   #E2E8F0;
-      --glass-bg:     rgba(18, 24, 36, 0.70);
-      --glass-border: rgba(226, 232, 240, 0.08);
-      --nav-bg:       rgba(7, 10, 15, 0.80);
-      --accent-glow:  rgba(6, 182, 212, 0.25);
+      --bg-base:      #0B1120;
+      --text-color:   #F1F5F9;
+      --glass-bg:     #131B2E;
+      --glass-border: #1E293B;
+      --nav-bg:       #0B1120;
     }
 
     /* ── Reset ── */
@@ -104,69 +86,13 @@
     }
 
     ::selection {
-      background-color: rgba(6, 182, 212, 0.30);
-      color: #E2E8F0;
+      background-color: rgba(56, 189, 248, 0.20);
+      color: #F1F5F9;
     }
 
-    /* ── Keyframes ── */
-
-    /* Hero text entry — staggered rise-up */
-    @keyframes riseUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Subtle grain shimmer */
-    @keyframes grain-shift {
-      0%, 100% { transform: translate(0, 0); }
-      10% { transform: translate(-2%, -2%); }
-      30% { transform: translate(1%, -1%); }
-      50% { transform: translate(-1%, 2%); }
-      70% { transform: translate(2%, 1%); }
-      90% { transform: translate(-2%, 1%); }
-    }
-
-    /* Dot grid subtle pulse */
-    @keyframes grid-fade {
-      0%, 100% { opacity: 0.03; }
-      50%       { opacity: 0.06; }
-    }
-
-    /* Scroll reveal */
-    @keyframes revealFadeUp {
-      from { opacity: 0; transform: translateY(22px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Hero entry animations — slow, deliberate */
-    .hero-badge  { animation: riseUp 0.7s var(--ease-out-expo) 0.05s both; }
-    .hero-line-1 { animation: riseUp 0.7s var(--ease-out-expo) 0.18s both; }
-    .hero-line-2 { animation: riseUp 0.7s var(--ease-out-expo) 0.30s both; }
-    .hero-sub    { animation: riseUp 0.7s var(--ease-out-expo) 0.44s both; }
-    .hero-ctas   { animation: riseUp 0.7s var(--ease-out-expo) 0.58s both; }
-    .hero-stats  { animation: riseUp 0.7s var(--ease-out-expo) 0.72s both; }
-
-    /* Scroll reveal utility */
-    .reveal {
-      opacity: 0;
-      transform: translateY(22px);
-      transition: opacity 0.65s var(--ease-out-expo),
-                  transform 0.65s var(--ease-out-expo);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    /* Card stagger delays */
-    .stagger-1 { transition-delay:   0ms; }
-    .stagger-2 { transition-delay:  80ms; }
-    .stagger-3 { transition-delay: 160ms; }
-    .stagger-4 { transition-delay: 240ms; }
-    .stagger-5 { transition-delay: 320ms; }
-
-    /* ── Body: deep obsidian canvas ── */
+    /* ── Body: Deep Slate Canvas ── */
     body {
-      background: #070A0F !important;
+      background: #0B1120 !important;
       color: var(--text-primary);
       font-family: var(--font-body);
       position: relative;
@@ -180,58 +106,6 @@
       background-image: none !important;
     }
 
-    /* ── Noise texture overlay — subtle grain for depth ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: -50%;
-      width: 200%;
-      height: 200%;
-      z-index: 0;
-      pointer-events: none;
-      opacity: 0.025;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-      animation: grain-shift 8s steps(10) infinite;
-    }
-
-    /* ── Fine dot grid overlay — structured, academic feel ── */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background-image: radial-gradient(
-        circle,
-        rgba(148, 163, 184, 0.07) 1px,
-        transparent 1px
-      );
-      background-size: 32px 32px;
-      animation: grid-fade 12s ease-in-out infinite;
-    }
-
-    /* ── Subtle radial vignette for depth ── */
-    #root::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background: radial-gradient(
-        ellipse 70% 60% at 50% 40%,
-        rgba(6, 182, 212, 0.03) 0%,
-        transparent 60%
-      );
-    }
-
-    /* ══ Respect user motion preferences ══ */
-    @media (prefers-reduced-motion: reduce) {
-      body::before,
-      body::after {
-        animation: none !important;
-      }
-    }
-
     /* Make sure app content sits above the background layers */
     #root > * {
       position: relative;
@@ -239,82 +113,46 @@
     }
 
     /* ═══════════════════════════════════════════
-       GLASS COMPONENTS — Obsidian Lab System
+       FLAT COMPONENTS — Restrained System
        ═══════════════════════════════════════════ */
 
-    /* Base glass panel — used on cards, sections */
+    /* Base surface panel — used on cards, sections */
     .glass-panel {
-      background: rgba(18, 24, 36, 0.60);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(226, 232, 240, 0.07);
-      box-shadow:
-        inset 0 1px 0 0 rgba(226, 232, 240, 0.04),
-        0 4px 24px rgba(0, 0, 0, 0.40),
-        0 1px 2px rgba(0, 0, 0, 0.20);
-      transition: border-color 0.3s var(--ease-out-expo),
-                  box-shadow   0.3s var(--ease-out-expo),
-                  transform    0.3s var(--ease-out-expo);
+      background: #131B2E;
+      border: 1px solid #1E293B;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s ease, transform 0.2s ease;
     }
 
     .glass-panel:hover {
-      border-color: rgba(6, 182, 212, 0.20);
-      box-shadow:
-        inset 0 1px 0 0 rgba(226, 232, 240, 0.06),
-        0 8px 32px rgba(0, 0, 0, 0.50),
-        0 0 0 1px rgba(6, 182, 212, 0.08);
+      border-color: rgba(56, 189, 248, 0.25);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
 
-    /* Navbar glass — floating, obsidian */
+    /* Navbar glass — flat, lifted surface */
     .glass-nav {
-      background: rgba(7, 10, 15, 0.60);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(226, 232, 240, 0.06);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.30);
+      background: rgba(11, 17, 32, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid #1E293B;
     }
 
-    .glass-nav--scrolled {
-      background: rgba(7, 10, 15, 0.85);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-color: rgba(226, 232, 240, 0.08);
-      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.40);
+    /* ── No text glow / drop-shadows ── */
+    .text-glow, .text-gold-glow {
+      text-shadow: none !important;
     }
 
-    /* ── Utility helpers ── */
-    .text-glow {
-      text-shadow: 0 0 20px rgba(6, 182, 212, 0.40);
-    }
+    /* ── Buttons — Restrained Flat System ── */
 
-    .text-gold-glow {
-      text-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
-    }
-
-    .hover-lift {
-      transition: transform 0.3s var(--ease-out-expo),
-                  box-shadow 0.3s var(--ease-out-expo);
-    }
-
-    .hover-lift:hover {
-      transform: translateY(-4px);
-    }
-
-    .preserve-3d {
-      transform-style: preserve-3d;
-    }
-
-    /* ── Buttons — Obsidian Lab CTA system ── */
-
-    /* Primary: Lab Cyan — precision instrument button */
+    /* Primary CTA: Solid Sky Blue, dark text */
     .btn-primary {
-      background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%);
-      color: #070A0F;
+      background: #38BDF8;
+      color: #0B1120 !important;
       font-family: var(--font-body);
       font-size: 15px;
       font-weight: 600;
-      height: 50px;
-      padding: 0 28px;
+      height: 48px;
+      padding: 0 26px;
       border-radius: var(--radius-lg);
       border: none;
       cursor: pointer;
@@ -324,100 +162,59 @@
       align-items: center;
       gap: 8px;
       position: relative;
-      overflow: hidden;
-      transition: transform      0.25s var(--ease-out-expo),
-                  box-shadow     0.25s var(--ease-out-expo);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.30);
+      transition: background-color 0.2s ease, transform 0.2s ease;
     }
-    .btn-primary::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
-      opacity: 0;
-      transition: opacity 0.25s var(--ease-out-expo);
-    }
-    .btn-primary:hover::before { opacity: 1; }
     .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(6, 182, 212, 0.30),
-                  0 0 0 1px rgba(6, 182, 212, 0.20);
-      color: #070A0F;
+      background: #0EA5E9;
+      color: #0B1120 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
     }
     .btn-primary:active {
       transform: translateY(0);
       box-shadow: none;
     }
-    .btn-primary > * { position: relative; z-index: 1; }
 
-    /* Secondary: Ghost Tactical */
+    /* Secondary CTA: Hairline Border, fills to surface on hover */
     .btn-secondary {
       background: transparent;
-      color: var(--text-primary);
-      border: 1px solid rgba(226, 232, 240, 0.12);
+      color: #F1F5F9;
+      border: 1px solid #1E293B;
       font-family: var(--font-body);
       font-size: 15px;
       font-weight: 500;
-      height: 50px;
-      padding: 0 28px;
+      height: 48px;
+      padding: 0 26px;
       border-radius: var(--radius-lg);
       cursor: pointer;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: border-color 0.25s var(--ease-out-expo),
-                  background  0.25s var(--ease-out-expo),
-                  box-shadow  0.25s var(--ease-out-expo),
-                  transform   0.25s var(--ease-out-expo);
+      transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
     }
     .btn-secondary:hover {
-      border-color: rgba(6, 182, 212, 0.30);
-      background: rgba(6, 182, 212, 0.06);
-      box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.10);
-      transform: translateY(-2px);
+      border-color: #38BDF8;
+      background: #131B2E;
+      transform: translateY(-1px);
     }
 
-    /* Ghost: transparent with subtle border */
-    .btn-ghost {
-      background: transparent;
-      color: #E2E8F0;
-      border: 1px solid rgba(226, 232, 240, 0.10);
-      font-family: var(--font-body);
-      font-size: 15px;
-      font-weight: 500;
-      height: 50px;
-      padding: 0 28px;
-      border-radius: var(--radius-lg);
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: border-color 0.25s var(--ease-out-expo),
-                  background  0.25s var(--ease-out-expo);
-    }
-    .btn-ghost:hover {
-      border-color: rgba(226, 232, 240, 0.20);
-      background: rgba(226, 232, 240, 0.04);
-    }
-
-    /* ── Hero pill badge ── */
+    /* ── Hero pill badge — Flat Surface ── */
     .hero-badge-pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(13, 17, 23, 0.92);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(6, 182, 212, 0.25);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.50), 0 0 12px rgba(6, 182, 212, 0.10);
-      color: #22D3EE;
+      background: #131B2E;
+      border: 1px solid #1E293B;
+      color: #94A3B8;
       font-family: var(--font-body);
       font-size: 13px;
       font-weight: 500;
-      padding: 7px 16px 7px 12px;
+      padding: 6px 16px;
       border-radius: var(--radius-full);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+      box-shadow: none !important;
     }
 
     /* ── Section overline label ── */
@@ -427,7 +224,7 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      color: #06B6D4;
+      color: #38BDF8;
       display: block;
       margin-bottom: 12px;
     }
@@ -451,11 +248,7 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30);
     }
     /* Subject top accent bars */
-    .subject-card[data-subject="physics"]   { border-top: 2px solid #5BA3D4; }
-    .subject-card[data-subject="chemistry"] { border-top: 2px solid #F5A623; }
-    .subject-card[data-subject="biology"]   { border-top: 2px solid #5BB887; }
-    .subject-card[data-subject="math"]      { border-top: 2px solid #A78BFA; }
-    .subject-card[data-subject="cs"]        { border-top: 2px solid #60C4D4; }
+    .subject-card[data-subject] { border-top: 2px solid #38BDF8; }
 
     /* ── Stat cards (inline divider-separated) ── */
     .stat-item {
@@ -478,22 +271,22 @@
       margin-top: 4px;
     }
 
-    /* ── Scrollbar — Lab Cyan themed ── */
+    /* ── Scrollbar ── */
     ::-webkit-scrollbar {
       width: 4px;
     }
 
     ::-webkit-scrollbar-track {
-      background: rgba(7, 10, 15, 0.9);
+      background: #0B1120;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, #06B6D4 0%, #0891B2 50%, #164E63 100%);
+      background: #1E293B;
       border-radius: 999px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, #22D3EE, #06B6D4);
+      background: #38BDF8;
     }
 
     /* ══════════════════════════════════════════════════
@@ -564,7 +357,6 @@
     /* Hover: accelerate rings */
     .ep-logo-link:hover .ep-outer-ring { animation-duration: 2.5s; }
     .ep-logo-link:hover .ep-inner-ring { animation-duration: 1.5s; }
-    .ep-logo-link:hover .ep-eglow      { opacity: 1 !important; }
 
     /* ═══════════════════════════════════════════
        GLOBAL TYPOGRAPHY OVERRIDES — Obsidian Lab
@@ -605,23 +397,21 @@
     }
     .text-emerald-600 { color: var(--accent-muted) !important; }
 
-    /* Bg emerald → Lab Cyan */
+    /* Bg emerald → accent */
     .bg-emerald-600,
     .bg-emerald-500 {
-      background: linear-gradient(135deg, #06B6D4, #0891B2) !important;
-      color: #070A0F !important;
+      background: #38BDF8 !important;
+      color: #0B1120 !important;
     }
     .hover\:bg-emerald-500:hover,
     .hover\:bg-emerald-600:hover {
-      background: linear-gradient(135deg, #22D3EE, #06B6D4) !important;
+      background: #0EA5E9 !important;
     }
 
-    /* Shadow emerald → cyan glow */
-    .shadow-emerald-600\/25 {
-      box-shadow: 0 8px 32px rgba(6, 182, 212, 0.20) !important;
-    }
+    /* Remove coloured glow shadows — plain elevation only */
+    .shadow-emerald-600\/25,
     .hover\:shadow-emerald-500\/30:hover {
-      box-shadow: 0 8px 32px rgba(6, 182, 212, 0.25) !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.30) !important;
     }
 
     /* Card backgrounds */
@@ -629,17 +419,17 @@
       background-color: var(--bg-card) !important;
     }
 
-    /* Purple accent → Lab Cyan */
-    .text-purple-400 { color: var(--accent-primary) !important; }
-    .from-violet-600  { --tw-gradient-from: #06B6D4 !important; }
-    .to-sky-500       { --tw-gradient-to:   #0891B2 !important; }
+    /* Purple accent → accent */
+    .text-purple-400 { color: var(--accent) !important; }
+    .from-violet-600  { --tw-gradient-from: #38BDF8 !important; }
+    .to-sky-500       { --tw-gradient-to:   #0EA5E9 !important; }
     .bg-gradient-to-r.from-violet-600.to-sky-500 {
-      background: linear-gradient(90deg, #06B6D4, #0891B2) !important;
+      background: #38BDF8 !important;
     }
 
-    /* Active nav underline: Lab Cyan */
+    /* Active nav indicator */
     .bg-emerald-400 {
-      background-color: #06B6D4 !important;
+      background-color: #38BDF8 !important;
     }
 
     /* Hero gradient overlay: disable, handled by body layers */

@@ -15,23 +15,41 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // ── Firebase Config ────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.replace(/"/g, ''),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.replace(/"/g, ''),
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID?.replace(/"/g, ''),
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.replace(/"/g, ''),
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY?.replace(/"/g, ''),
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.replace(/"/g, ''),
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID?.replace(/"/g, ''),
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.replace(/"/g, ''),
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.replace(/"/g, ''),
-  appId: import.meta.env.VITE_FIREBASE_APP_ID?.replace(/"/g, ''),
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID?.replace(/"/g, ''),
 };
 
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === '""' || firebaseConfig.apiKey.includes('VITE_')) {
-  console.warn('Firebase keys missing. Using dummy config to prevent React crash.');
+// ── Validate all required keys are present ───────────────────────
+const requiredKeys = [
+  'apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId',
+] as const;
+
+const missingKeys = requiredKeys.filter(k => {
+  const v = firebaseConfig[k];
+  return !v || v.startsWith('VITE_') || v === '""' || v === '';
+});
+
+if (missingKeys.length > 0) {
+  console.error(
+    `[E-Prayog] ❌ Firebase config is INCOMPLETE.\n` +
+    `Missing environment variables: ${missingKeys.map(k => `VITE_FIREBASE_${k.replace(/([A-Z])/g, '_$1').toUpperCase()}`).join(', ')}\n` +
+    `→ On Netlify: Site Settings → Environment Variables\n` +
+    `→ On Vercel: Project Settings → Environment Variables\n` +
+    `→ Locally: Add to your .env file\n` +
+    `Auth will not work until these are set.`
+  );
+  // Apply fallback dummy config to prevent a hard crash
   Object.assign(firebaseConfig, {
-    apiKey: 'dummy-api-key-to-prevent-crash',
-    authDomain: 'dummy.firebaseapp.com',
-    projectId: 'dummy-project',
-    storageBucket: 'dummy.appspot.com',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:web:abcdef123456',
+    apiKey:            firebaseConfig.apiKey            || 'dummy-api-key-to-prevent-crash',
+    authDomain:        firebaseConfig.authDomain        || 'dummy.firebaseapp.com',
+    projectId:         firebaseConfig.projectId         || 'dummy-project',
+    storageBucket:     firebaseConfig.storageBucket     || 'dummy.appspot.com',
+    messagingSenderId: firebaseConfig.messagingSenderId || '123456789',
+    appId:             firebaseConfig.appId             || '1:123456789:web:abcdef123456',
   });
 }
 

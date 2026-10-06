@@ -22,6 +22,8 @@ const MotionDiv = motion.div as any;
 
 function friendlyError(err: any): string {
   const msg = err?.message || err?.code || '';
+  if (msg.includes('unauthorized-domain')) return 'This domain is not authorised by Firebase. Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.';
+  if (msg.includes('invalid-api-key') || msg.includes('api-key-not-valid')) return 'Firebase API key is invalid or missing. Check your environment variables on your hosting platform (Netlify/Vercel).';
   if (msg.includes('invalid-credential') || msg.includes('wrong-password') || msg.includes('user-not-found')) return 'Invalid ID or password. Please try again.';
   if (msg.includes('email-already-in-use')) return 'An account with this email already exists.';
   if (msg.includes('weak-password')) return 'Password must be at least 6 characters.';
@@ -31,6 +33,7 @@ function friendlyError(err: any): string {
   if (msg.includes('popup-closed')) return 'Sign-in popup was closed. Please try again.';
   if (msg.includes('popup-blocked')) return 'Popup was blocked. Please allow popups for this site.';
   if (msg.includes('account-exists-with-different-credential')) return 'An account with this email exists using a different sign-in method.';
+  if (msg.includes('network-request-failed')) return 'Network error. Check your internet connection. If deployed, verify all Firebase environment variables are set on your hosting platform.';
   return msg || 'Something went wrong. Please try again.';
 }
 

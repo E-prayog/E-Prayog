@@ -16,6 +16,7 @@ import {
 import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
 import { quizData } from '../data/quizData';
+import { subscribeToLabQuiz, getDefaultQuizQuestions } from '../services/quizService';
 
 
 const MotionDiv = motion.div as any;
@@ -136,83 +137,39 @@ const LabView: React.FC = () => {
     printWindow.print();
   };
 
-  // Setup Quiz and Viva
-  const labIdToQuizKey: Record<string, string> = {
-    // Physics
-    p1: 'vernierCalipers',
-    p2: 'simplePendulum',
-    p3: 'screwGauge',
-    p4: 'ohmsLaw',
-    p5: 'concaveMirror',
-    p6: 'convexLens',
-    p7: 'glassPrism',
-    p8: 'sonometer',
-    p9: 'metreBridge',
-    p10: 'potentiometer',
-    p11: 'zenerDiode',
-    p12: 'hookesLaw',
-    
-    // Chemistry
-    c1: 'acidBaseTitration',
-    c2: 'kmno4Titration',
-    c3: 'phOfSolutions',
-    c4: 'saltAnalysis',
-    c5: 'paperChromatography',
-    c6: 'enthalpyNeutralisation',
-    c7: 'rateOfReaction',
-    c8: 'cationAnalysis',
-    c9: 'anionAnalysis',
-    c10: 'crystallisation',
-
-    // Biology
-    b1: 'mitosis',
-    b2: 'stomata',
-    b3: 'osmosis',
-    b4: 'photosynthesis',
-    b5: 'dnaIsolation',
-    b6: 'benedictTest',
-    b7: 'bloodGroup',
-    b8: 'seedGermination',
-
-    // Math
-    m1: 'unitCircle',
-    m2: 'binomialTheorem',
-    m3: 'statistics',
-    m4: 'matrixOperations',
-    m5: 'probability',
-    m6: 'conicSections',
-
-    // CS
-    cs1: 'bubbleSort',
-    cs2: 'insertionSort',
-    cs3: 'binarySearch',
-    cs4: 'stackOperations',
-    cs5: 'queueOperations',
-    cs6: 'logicGates',
-  };
-
-  const getQuestions = () => {
-    if (!labId) return [];
-    const key = labIdToQuizKey[labId];
-    if (!key) return content?.quizQuestions || [];
-    
-    const rawQuestions = quizData[key];
-    if (!rawQuestions || rawQuestions.length === 0) {
-      return content?.quizQuestions || [];
-    }
-    
-    return rawQuestions.map((q) => ({
-      id: q.id as any,
+  // Real-time Quiz Questions (dynamic from Firestore custom quiz or standard defaults)
+  const [quizQuestions, setQuizQuestions] = useState<any[]>(() => {
+    return labId ? getDefaultQuizQuestions(labId).map(q => ({
+      id: q.id,
       question: q.question,
       options: q.options,
-      correctIndex: q.correctAnswer,
+      correctIndex: typeof q.correctAnswer === 'number' ? q.correctAnswer : (q as any).correctIndex ?? 0,
       explanation: q.explanation,
       level: q.level,
-      hint: q.hint
-    }));
-  };
+      hint: q.hint,
+    })) : [];
+  });
+  const [isCustomQuiz, setIsCustomQuiz] = useState<boolean>(false);
 
-  const quizQuestions = getQuestions();
+  useEffect(() => {
+    if (!labId) return;
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizScore(0);
+    const unsub = subscribeToLabQuiz(labId, (qs, custom) => {
+      setQuizQuestions(qs.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctIndex: typeof q.correctAnswer === 'number' ? q.correctAnswer : (q as any).correctIndex ?? 0,
+        explanation: q.explanation,
+        level: q.level,
+        hint: q.hint,
+      })));
+      setIsCustomQuiz(custom);
+    });
+    return () => unsub();
+  }, [labId]);
 
   const handleQuizSubmit = async () => {
     let score = 0;

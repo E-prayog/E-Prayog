@@ -1,198 +1,684 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-const LC = 0.01; // cm
+// Object parameters
+const OBJECTS = {
+  cylinder: { diameter: 2.34, label: 'Cylinder', color: '#D97706' },
+  block: { diameter: 1.87, label: 'Block', color: '#94A3B8' },
+  sphere: { diameter: 3.15, label: 'Sphere', color: '#F59E0B' },
+};
 
-const VernierCalipersLab: React.FC = () => {
+export default function VernierCalipersLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [jawPos, setJawPos] = useState(48); // 0-100 slider => 0-5 cm
+  const rafRef = useRef<number>(0);
+  
+  // Physics and interaction state stored in refs to avoid closure staleness in rAF
+  const simState = useRef({
+    jawPos: 0, // cm
+    objectType: 'cylinder' as keyof typeof OBJECTS,
+    isLocked: false,
+    isDragging: false,
+    dragStartX: 0,
+    startJawPos: 0,
+    hoverLock: false,
+  });
 
-  const diameter = (jawPos / 100) * 5;
-  const msr = Math.floor(diameter * 10) / 10;
-  const vsd = Math.round((diameter - msr) / LC);
-  const reading = msr + vsd * LC;
+  // UI state for React shell
+  const [uiState, setUiState] = useState({
+    jawPos: 0,
+    objectType: 'cylinder' as keyof typeof OBJECTS,
+    isLocked: false,
+    msr: 0,
+    vsd: 0,
+    total: 0
+  });
+
+  const updateUI = useCallback(() => {
+    const s = simState.current;
+    
+    // Calculate readings
+    const msr = Math.floor(s.jawPos * 10) / 10;
+    
+    let bestVsd = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i <= 10; i++) {
+      const vX = s.jawPos * 10 + i * 0.9;
+      const nearestMainX = Math.round(vX);
+      const diff = Math.abs(vX - nearestMainX);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestVsd = i;
+      }
+    }
+    
+    const total = msr + bestVsd * 0.01;
+    
+    setUiState({
+      jawPos: s.jawPos,
+      objectType: s.objectType,
+      isLocked: s.isLocked,
+      msr,
+      vsd: bestVsd,
+      total
+    });
+  }, []);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const s = simState.current;
+    const width = 960;
+    const height = 520;
+    const pxPerCm = 100;
+    const pxPerMm = pxPerCm / 10;
+    const zeroX = 250;
+    const mainBarY = 220;
+    
+    // Clear and draw background
+    ctx.fillStyle = '#F8F9FA';
+    ctx.fillRect(0, 0, width, height);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < width; x += 20) { ctx.moveTo(x, 0); ctx.lineTo(x, height); }
+    for (let y = 0; y < height; y += 20) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
+    ctx.stroke();
+
+    // Bench bottom edge
+    const benchGradient = ctx.createLinearGradient(0, height - 60, 0, height);
+    benchGradient.addColorStop(0, 'rgba(0,0,0,0)');
+    benchGradient.addColorStop(1, 'rgba(0,0,0,0.08)');
+    ctx.fillStyle = benchGradient;
+    ctx.fillRect(0, height - 60, width, 60);
+    
+    const objDiameterCm = OBJECTS[s.objectType].diameter;
+    const jawPx = s.jawPos * pxPerCm;
+    
+    // Draw Object
+    ctx.save();
+    const objW = objDiameterCm * pxPerCm;
+    const objH = Math.min(objW, 80);
+    const objX = zeroX + objW / 2;
+    const objY = mainBarY + 50;
+
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.12)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 5;
+
+    ctx.translate(objX, objY);
+    if (s.objectType === 'cylinder') {
+      const grad = ctx.createLinearGradient(-objW/2, -objH/2, objW/2, objH/2);
+      grad.addColorStop(0, '#D97706');
+      grad.addColorStop(1, '#B45309');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(-objW/2, -objH/2, objW, objH, 8);
+      ctx.fill();
+    } else if (s.objectType === 'block') {
+      const grad = ctx.createLinearGradient(-objW/2, -objH/2, objW/2, objH/2);
+      grad.addColorStop(0, '#94A3B8');
+      grad.addColorStop(1, '#64748B');
+      ctx.fillStyle = grad;
+      ctx.fillRect(-objW/2, -objH/2, objW, objH);
+    } else if (s.objectType === 'sphere') {
+      const grad = ctx.createRadialGradient(-objW/6, -objW/6, objW/10, 0, 0, objW/2);
+      grad.addColorStop(0, '#FCD34D');
+      grad.addColorStop(0.3, '#F59E0B');
+      grad.addColorStop(1, '#92400E');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, objW/2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Contact Glow
+    const isTouching = Math.abs(s.jawPos - objDiameterCm) < 0.02;
+    if (isTouching) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(14,165,233,0.8)';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = '#0EA5E9';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(zeroX, objY - 30); ctx.lineTo(zeroX, objY + 30);
+      ctx.moveTo(zeroX + jawPx, objY - 30); ctx.lineTo(zeroX + jawPx, objY + 30);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // --- Caliper Drawing Functions ---
+    const drawMainScaleBar = () => {
+      const barX = zeroX - 40;
+      const barY = mainBarY;
+      const barW = 750;
+      const barH = 44;
+      
+      const grad = ctx.createLinearGradient(0, barY, 0, barY + barH);
+      grad.addColorStop(0, '#F1F5F9');
+      grad.addColorStop(0.5, '#CBD5E1');
+      grad.addColorStop(1, '#94A3B8');
+      
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#94A3B8';
+      ctx.lineWidth = 1;
+      
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner groove
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillRect(barX + 10, barY + 22, barW - 20, 10);
+
+      // Main scale markings
+      ctx.fillStyle = '#1E293B';
+      ctx.textAlign = 'center';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      
+      for (let i = 0; i <= 150; i++) {
+        const mx = zeroX + i * pxPerMm;
+        let h = 6;
+        if (i % 10 === 0) h = 14;
+        else if (i % 5 === 0) h = 10;
+        
+        ctx.fillRect(mx - 0.5, barY, 1, h);
+        
+        if (i % 10 === 0) {
+          ctx.fillText((i / 10).toString(), mx, barY + h + 12);
+        }
+      }
+    };
+
+    const drawFixedJaw = () => {
+      const grad = ctx.createLinearGradient(zeroX - 30, 0, zeroX, 0);
+      grad.addColorStop(0, '#CBD5E1');
+      grad.addColorStop(1, '#94A3B8');
+      
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 1;
+
+      // Lower fixed jaw
+      ctx.beginPath();
+      ctx.moveTo(zeroX - 30, mainBarY + 44);
+      ctx.lineTo(zeroX, mainBarY + 44);
+      ctx.lineTo(zeroX, mainBarY + 110);
+      ctx.lineTo(zeroX - 10, mainBarY + 110);
+      ctx.lineTo(zeroX - 30, mainBarY + 70);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Upper fixed jaw
+      ctx.beginPath();
+      ctx.moveTo(zeroX - 30, mainBarY);
+      ctx.lineTo(zeroX, mainBarY);
+      ctx.lineTo(zeroX, mainBarY - 35);
+      ctx.lineTo(zeroX - 10, mainBarY - 35);
+      ctx.lineTo(zeroX - 30, mainBarY - 15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    };
+
+    const drawMovableJaw = (jx: number) => {
+      const blockX = zeroX + jx;
+      const blockW = 110;
+      const blockY = mainBarY - 4;
+      const blockH = 52;
+      
+      const grad = ctx.createLinearGradient(0, blockY, 0, blockY + blockH);
+      grad.addColorStop(0, '#F1F5F9');
+      grad.addColorStop(0.5, '#CBD5E1');
+      grad.addColorStop(1, '#94A3B8');
+      
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 1;
+      
+      // Sliding block
+      ctx.beginPath();
+      ctx.roundRect(blockX, blockY, blockW, blockH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Lower movable jaw
+      ctx.beginPath();
+      ctx.moveTo(blockX, mainBarY + 44);
+      ctx.lineTo(blockX + 30, mainBarY + 44);
+      ctx.lineTo(blockX + 30, mainBarY + 70);
+      ctx.lineTo(blockX + 10, mainBarY + 110);
+      ctx.lineTo(blockX, mainBarY + 110);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Upper movable jaw
+      ctx.beginPath();
+      ctx.moveTo(blockX, mainBarY);
+      ctx.lineTo(blockX + 30, mainBarY);
+      ctx.lineTo(blockX + 30, mainBarY - 15);
+      ctx.lineTo(blockX + 10, mainBarY - 35);
+      ctx.lineTo(blockX, mainBarY - 35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Lock screw
+      ctx.save();
+      ctx.translate(blockX + 25, blockY - 8);
+      ctx.fillStyle = s.hoverLock ? '#CBD5E1' : '#94A3B8';
+      ctx.beginPath();
+      ctx.roundRect(-8, -4, 16, 8, 2);
+      ctx.fill();
+      ctx.stroke();
+      if (s.isLocked) ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-6, -1, 12, 2);
+      ctx.fillRect(-1, -6, 2, 12);
+      ctx.restore();
+
+      // Thumbwheel
+      ctx.fillStyle = '#64748B';
+      ctx.fillRect(blockX + blockW - 15, blockY + blockH, 15, 8);
+      ctx.fillStyle = '#475569';
+      for (let i = 0; i < 15; i += 3) {
+        ctx.fillRect(blockX + blockW - 15 + i, blockY + blockH, 1, 8);
+      }
+      
+      // Depth rod
+      ctx.fillStyle = '#CBD5E1';
+      ctx.fillRect(zeroX + 710, mainBarY + 15, jx, 10);
+      ctx.strokeRect(zeroX + 710, mainBarY + 15, jx, 10);
+
+      // Vernier scale markings & calculation
+      ctx.fillStyle = '#1E293B';
+      ctx.textAlign = 'center';
+      ctx.font = '8px "JetBrains Mono", monospace';
+      
+      let bestVsd = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i <= 10; i++) {
+        const vX = s.jawPos * 10 + i * 0.9;
+        const nearestMainX = Math.round(vX);
+        const diff = Math.abs(vX - nearestMainX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestVsd = i;
+        }
+      }
+
+      for (let i = 0; i <= 10; i++) {
+        const vx = blockX + i * 9;
+        const isBest = (i === bestVsd);
+        
+        ctx.save();
+        if (isBest) {
+          ctx.fillStyle = '#0EA5E9';
+          ctx.shadowColor = '#0EA5E9';
+          ctx.shadowBlur = 4;
+        }
+        
+        let h = 8;
+        if (i % 5 === 0) h = 12;
+        
+        ctx.fillRect(vx - 0.5, blockY + blockH - h, 1, h);
+        
+        if (i === 0 || i === 5 || i === 10) {
+          ctx.fillText(i.toString(), vx, blockY + blockH - h - 4);
+        }
+        ctx.restore();
+      }
+    };
+
+    drawMainScaleBar();
+    drawFixedJaw();
+    drawMovableJaw(jawPx);
+
+    // --- Magnified Loupe ---
+    const drawLoupe = () => {
+      const cx = 150;
+      const cy = 120;
+      const r = 75;
+      
+      ctx.save();
+      // Loupe border
+      const borderGrad = ctx.createRadialGradient(cx, cy, r - 5, cx, cy, r + 5);
+      borderGrad.addColorStop(0, '#94A3B8');
+      borderGrad.addColorStop(0.5, '#F8FAFC');
+      borderGrad.addColorStop(1, '#475569');
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = borderGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Clip area
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+
+      // Zoom transform centered on vernier zero
+      const targetX = zeroX + jawPx;
+      const targetY = mainBarY + 30;
+      const zoom = 3;
+      
+      ctx.translate(cx, cy);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-targetX, -targetY);
+
+      // Re-draw scale area
+      drawMainScaleBar();
+      drawMovableJaw(jawPx);
+
+      ctx.restore();
+
+      // Glass shine
+      ctx.save();
+      const shineGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      shineGrad.addColorStop(0, 'rgba(255,255,255,0.4)');
+      shineGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+      shineGrad.addColorStop(1, 'rgba(200,220,255,0.1)');
+      ctx.fillStyle = shineGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+    drawLoupe();
+
+    // --- Reading Panel on Canvas ---
+    const drawReadingPanel = () => {
+      const px = width - 220;
+      const py = 30;
+      const pw = 190;
+      const ph = 140;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.1)';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.roundRect(px, py, pw, ph, 8);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('READING', px + pw/2, py + 20);
+
+      // Calculations again for panel
+      const msr = Math.floor(s.jawPos * 10) / 10;
+      let bestVsd = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i <= 10; i++) {
+        const vX = s.jawPos * 10 + i * 0.9;
+        const nearestMainX = Math.round(vX);
+        const diff = Math.abs(vX - nearestMainX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestVsd = i;
+        }
+      }
+      const lc = 0.01;
+      const total = msr + bestVsd * lc;
+
+      const labels = ['MSR:', 'VSD:', 'LC:', 'Total:'];
+      const values = [`${msr.toFixed(1)} cm`, `${bestVsd}`, `${lc.toFixed(2)} cm`, `${total.toFixed(2)} cm`];
+
+      ctx.textAlign = 'left';
+      ctx.font = '12px "Plus Jakarta Sans", sans-serif';
+      for(let i=0; i<4; i++) {
+        ctx.fillStyle = '#475569';
+        ctx.fillText(labels[i], px + 20, py + 50 + i * 22);
+        
+        ctx.textAlign = 'right';
+        ctx.fillStyle = i === 3 ? '#10B981' : '#0EA5E9';
+        ctx.font = 'bold 13px "JetBrains Mono", monospace';
+        ctx.fillText(values[i], px + pw - 20, py + 50 + i * 22);
+        ctx.textAlign = 'left';
+      }
+
+      ctx.restore();
+    };
+    drawReadingPanel();
+
+    rafRef.current = requestAnimationFrame(draw);
+  }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-
-    // ── Dark lab background ──
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#07090f'); bg.addColorStop(1, '#040507');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-    // Subtle grid
-    ctx.fillStyle = 'rgba(56,189,248,0.01)';
-    for (let x = 0; x < W; x += 20) { ctx.fillRect(x, 0, 1, H); }
-    for (let y = 0; y < H; y += 20) { ctx.fillRect(0, y, W, 1); }
-
-    const scaleL = W * 0.75;
-    const ox = 70;
-    const oy = H / 2 - 20;
-
-    // ── Main scale bar (metallic) ──
-    const mainGrad = ctx.createLinearGradient(ox, oy, ox, oy + 40);
-    mainGrad.addColorStop(0, '#334155'); mainGrad.addColorStop(0.5, '#475569'); mainGrad.addColorStop(1, '#1e293b');
-    ctx.fillStyle = mainGrad;
-    ctx.beginPath(); ctx.roundRect(ox, oy, scaleL + 40, 40, 4); ctx.fill();
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1; ctx.stroke();
-    // Inner groove
-    ctx.fillStyle = '#1e293b'; ctx.fillRect(ox + 5, oy + 25, scaleL + 30, 8);
-    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1; ctx.strokeRect(ox + 5, oy + 25, scaleL + 30, 8);
-
-    // Main scale markings (0 to 6 cm)
-    ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center';
-    ctx.strokeStyle = '#e2e8f0';
-    for (let i = 0; i <= 60; i++) {
-      const x = ox + (i / 50) * (scaleL * 0.833); // adjust scale to show 6cm
-      if (x > ox + scaleL + 30) break;
-      const isCm = i % 10 === 0;
-      const isHalf = i % 5 === 0;
-      ctx.lineWidth = isCm ? 1.5 : 0.8;
-      ctx.beginPath(); ctx.moveTo(x, oy); ctx.lineTo(x, oy + (isCm ? 12 : isHalf ? 8 : 5)); ctx.stroke();
-      if (isCm) ctx.fillText(`${i / 10}`, x, oy + 23);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = 960 * dpr;
+      canvas.height = 520 * dpr;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
     }
 
-    // ── Fixed Jaw (left) ──
-    const fixGrad = ctx.createLinearGradient(ox - 10, oy - 20, ox + 15, oy + 100);
-    fixGrad.addColorStop(0, '#1e293b'); fixGrad.addColorStop(0.3, '#475569'); fixGrad.addColorStop(1, '#0f172a');
-    ctx.fillStyle = fixGrad;
-    ctx.beginPath();
-    ctx.moveTo(ox + 10, oy);
-    ctx.lineTo(ox - 10, oy); ctx.lineTo(ox - 10, oy + 100); ctx.lineTo(ox, oy + 100);
-    ctx.lineTo(ox + 10, oy + 40); ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1; ctx.stroke();
-    // Inside measurement jaw (top)
-    ctx.beginPath();
-    ctx.moveTo(ox + 10, oy); ctx.lineTo(ox - 10, oy); ctx.lineTo(ox - 10, oy - 30);
-    ctx.lineTo(ox, oy - 30); ctx.lineTo(ox + 10, oy); ctx.fill(); ctx.stroke();
+    rafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [draw]);
 
-    // ── Movable Vernier Scale & Jaw ──
-    const vOffset = ox + 10 + (diameter / 5) * (scaleL * 0.833);
-    const vW = 100;
-    
-    // Movable scale block
-    const vernGrad = ctx.createLinearGradient(vOffset, oy - 5, vOffset, oy + 45);
-    vernGrad.addColorStop(0, '#1a2235'); vernGrad.addColorStop(0.5, '#3b5070'); vernGrad.addColorStop(1, '#1a2235');
-    ctx.fillStyle = vernGrad;
-    ctx.beginPath(); ctx.roundRect(vOffset, oy - 4, vW, 48, 5); ctx.fill();
-    ctx.strokeStyle = '#4a7db5'; ctx.lineWidth = 1.5; ctx.stroke();
-    
-    // Vernier scale markings (0-10 divisions covering 9 main scale divs)
-    ctx.strokeStyle = '#38bdf8'; ctx.fillStyle = '#38bdf8'; ctx.font = '9px Inter';
-    const mainDivWidth = (scaleL * 0.833) / 50;
-    const vDivWidth = (9 * mainDivWidth) / 10;
-    
-    for (let i = 0; i <= 10; i++) {
-      const x = vOffset + 8 + i * vDivWidth;
-      const isMajor = i % 5 === 0;
-      const isActive = i === vsd;
-      
-      ctx.lineWidth = isActive ? 2 : isMajor ? 1.5 : 0.8;
-      ctx.strokeStyle = isActive ? '#10b981' : isMajor ? '#38bdf8' : '#0ea5e9';
-      
-      ctx.beginPath(); ctx.moveTo(x, oy - 4); ctx.lineTo(x, oy + (isMajor ? 10 : 6)); ctx.stroke();
-      if (isMajor) {
-        ctx.fillStyle = isActive ? '#10b981' : '#38bdf8';
-        ctx.fillText(`${i}`, x, oy + 20);
-      }
-      
-      if (isActive) {
-        ctx.shadowBlur = 6; ctx.shadowColor = '#10b981';
-        ctx.strokeStyle = '#10b981';
-        ctx.beginPath(); ctx.moveTo(x, oy - 4); ctx.lineTo(x, oy + 12); ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
+  // Event handlers
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    // Normalize coordinates based on scaling
+    const scaleX = 960 / rect.width;
+    const scaleY = 520 / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    const s = simState.current;
+    const pxPerCm = 100;
+    const zeroX = 250;
+    const blockX = zeroX + s.jawPos * pxPerCm;
+    const blockY = 216;
+    const blockW = 110;
+    const blockH = 52;
+
+    // Check if clicking lock screw
+    const screwX = blockX + 25;
+    const screwY = blockY - 8;
+    if (Math.abs(x - screwX) < 15 && Math.abs(y - screwY) < 15) {
+      s.isLocked = !s.isLocked;
+      updateUI();
+      return;
     }
 
-    // Movable jaw (bottom)
-    ctx.fillStyle = fixGrad;
-    ctx.beginPath();
-    ctx.moveTo(vOffset + 5, oy + 44);
-    ctx.lineTo(vOffset - 5, oy + 44); ctx.lineTo(vOffset - 5, oy + 100); ctx.lineTo(vOffset + 5, oy + 100);
-    ctx.lineTo(vOffset + 15, oy + 60); ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1; ctx.stroke();
+    if (s.isLocked) return;
+
+    if (x >= blockX && x <= blockX + blockW && y >= blockY && y <= blockY + blockH + 90) {
+      s.isDragging = true;
+      s.dragStartX = x;
+      s.startJawPos = s.jawPos;
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = 960 / rect.width;
+    const scaleY = 520 / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    const s = simState.current;
     
-    // Movable inside jaw (top)
-    ctx.beginPath();
-    ctx.moveTo(vOffset + 5, oy - 4); ctx.lineTo(vOffset - 5, oy - 4); ctx.lineTo(vOffset - 5, oy - 30);
-    ctx.lineTo(vOffset + 5, oy - 30); ctx.lineTo(vOffset + 15, oy - 4); ctx.fill(); ctx.stroke();
-
-    // Thumb screw
-    ctx.fillStyle = '#64748b';
-    ctx.beginPath(); ctx.roundRect(vOffset + vW - 15, oy + 44, 12, 16, 2); ctx.fill();
-    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.stroke();
-
-    // ── Object (steel bearing) ──
-    if (diameter > 0.05) {
-      const objCx = ox + 10 + (vOffset - 5 - (ox + 10)) / 2;
-      const objCy = oy + 65;
-      const objR = Math.min((vOffset - 5 - (ox + 10)) / 2, 30);
-      
-      if (objR > 2) {
-        const oGrad = ctx.createRadialGradient(objCx - objR*0.3, objCy - objR*0.3, 0, objCx, objCy, objR);
-        oGrad.addColorStop(0, '#e2e8f0'); oGrad.addColorStop(0.5, '#94a3b8'); oGrad.addColorStop(1, '#334155');
-        ctx.shadowBlur = 10; ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.fillStyle = oGrad;
-        ctx.beginPath(); ctx.arc(objCx, objCy, objR, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
-      }
+    // Hover logic for lock screw
+    const pxPerCm = 100;
+    const zeroX = 250;
+    const blockX = zeroX + s.jawPos * pxPerCm;
+    const screwX = blockX + 25;
+    const screwY = 216 - 8;
+    const isHoverScrew = Math.abs(x - screwX) < 15 && Math.abs(y - screwY) < 15;
+    
+    if (isHoverScrew !== s.hoverLock) {
+      s.hoverLock = isHoverScrew;
     }
 
-    // Bench
-    const bench = ctx.createLinearGradient(0, H - 15, 0, H);
-    bench.addColorStop(0, '#3d2a1a'); bench.addColorStop(1, '#2a1d0f');
-    ctx.fillStyle = bench; ctx.fillRect(0, H - 15, W, 15);
-    ctx.strokeStyle = '#5c3d1e'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, H - 15); ctx.lineTo(W, H - 15); ctx.stroke();
+    if (s.isDragging) {
+      const dx = x - s.dragStartX;
+      let newPosCm = s.startJawPos + dx / pxPerCm;
+      
+      const objDiameter = OBJECTS[s.objectType].diameter;
+      
+      // Snapping near object
+      if (Math.abs(newPosCm - objDiameter) < 0.1 && newPosCm < objDiameter + 0.1) {
+        newPosCm = objDiameter;
+      }
+      
+      // Clamp values
+      if (newPosCm < objDiameter) newPosCm = objDiameter; // Cannot crush object
+      if (newPosCm < 0) newPosCm = 0;
+      if (newPosCm > 10) newPosCm = 10; // Max scale
 
-    // Verification text
-    ctx.shadowBlur = 6; ctx.shadowColor = '#10b981';
-    ctx.fillStyle = '#10b981'; ctx.font = 'bold 12px Inter'; ctx.textAlign = 'center';
-    ctx.fillText(`MSR = ${msr.toFixed(1)} cm | VSD = ${vsd} | LC = ${LC} cm | Total = ${reading.toFixed(2)} cm`, W / 2, H - 25);
-    ctx.shadowBlur = 0;
+      s.jawPos = newPosCm;
+      canvas.style.cursor = 'grabbing';
+      
+      // Throttle React updates somewhat during drag if needed, but here we just update
+      updateUI();
+    } else {
+      const isOverJaw = x >= blockX && x <= blockX + 110 && y >= 216 && y <= 350;
+      if (isHoverScrew) canvas.style.cursor = 'pointer';
+      else if (isOverJaw && !s.isLocked) canvas.style.cursor = 'grab';
+      else canvas.style.cursor = 'default';
+    }
+  };
 
-  }, [jawPos, diameter, msr, vsd, reading]);
+  const handlePointerUp = () => {
+    const s = simState.current;
+    if (s.isDragging) {
+      s.isDragging = false;
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = 'default';
+      updateUI();
+    }
+  };
+
+  const reset = () => {
+    simState.current.jawPos = 10;
+    simState.current.isLocked = false;
+    updateUI();
+  };
+
+  const setObj = (type: keyof typeof OBJECTS) => {
+    simState.current.objectType = type;
+    simState.current.jawPos = Math.max(simState.current.jawPos, OBJECTS[type].diameter);
+    updateUI();
+  };
 
   return (
-    <div className="flex flex-col h-full gap-0" style={{ background: 'linear-gradient(160deg,#06080f 0%,#040507 100%)', borderRadius: '12px', overflow: 'hidden' }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(56,189,248,0.2)', background: 'rgba(7,9,15,0.9)' }}>
-        <div>
-          <h3 className="text-sm font-semibold text-white tracking-wide">📏 Vernier Calipers</h3>
-          <p className="text-[10px] text-zinc-500 mt-0.5">Least Count (LC) = {LC} cm &nbsp;|&nbsp; Reading = MSR + (VSD × LC)</p>
-        </div>
-        <div className="text-xs font-mono px-3 py-1.5 rounded-lg" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-          {reading.toFixed(2)} cm
+    <div className="w-full h-full min-h-screen bg-[#070A0F] text-slate-200 flex flex-col font-sans p-6 overflow-hidden">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 px-4 py-3 bg-[#0F172A] border border-cyan-500/20 rounded-xl shadow-lg shadow-cyan-900/10">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-2">
+          <span>📏</span> Vernier Calipers
+        </h1>
+        <div className="px-4 py-1.5 bg-slate-900 rounded-lg border border-slate-700/50 flex gap-4 text-sm">
+          <span className="text-slate-400">Status: <span className={uiState.isLocked ? "text-amber-500" : "text-emerald-400"}>{uiState.isLocked ? "LOCKED" : "UNLOCKED"}</span></span>
+          <span className="text-slate-400">Total: <span className="text-cyan-400 font-mono font-bold">{uiState.total.toFixed(2)} cm</span></span>
         </div>
       </div>
-      
-      <canvas ref={canvasRef} width={680} height={320} className="w-full" style={{ display: 'block' }} />
-      
-      <div className="px-4 py-3 flex flex-col gap-3 border-t" style={{ borderColor: 'rgba(56,189,248,0.12)', background: 'rgba(5,7,12,0.97)' }}>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-zinc-400 whitespace-nowrap">Slide Jaw</span>
-          <input id="vernier-jaw-slider" type="range" min={0} max={100} step={0.2} value={jawPos} onChange={e => setJawPos(Number(e.target.value))} className="flex-1 h-1.5 rounded-full accent-sky-500" />
-          <span className="text-xs font-mono text-sky-400 w-16 text-right">{diameter.toFixed(2)} cm</span>
+
+      {/* Main Canvas Area */}
+      <div className="flex-grow flex flex-col items-center justify-center relative bg-slate-900/50 border border-slate-800 rounded-2xl p-4 overflow-hidden shadow-2xl">
+        <div className="w-full max-w-5xl aspect-[960/520] relative rounded-xl overflow-hidden ring-1 ring-white/10 shadow-black/50 shadow-2xl bg-white">
+          <canvas
+            ref={canvasRef}
+            style={{ width: '100%', height: '100%', touchAction: 'none' }}
+            className="block select-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          />
         </div>
+      </div>
+
+      {/* Controls & Readings */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: 'MSR', val: `${msr.toFixed(1)} cm`, color: '#e2e8f0', bg: 'rgba(226,232,240,0.05)', border: 'rgba(226,232,240,0.15)' },
-            { label: 'VSD', val: `${vsd} div`, color: '#38bdf8', bg: 'rgba(56,189,248,0.08)', border: 'rgba(56,189,248,0.2)' },
-            { label: 'VSD × LC', val: `${(vsd * LC).toFixed(2)} cm`, color: '#818cf8', bg: 'rgba(129,140,248,0.08)', border: 'rgba(129,140,248,0.2)' },
-            { label: 'TOTAL', val: `${reading.toFixed(2)} cm`, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
-          ].map(m => (
-            <div key={m.label} className="rounded-xl p-2.5 text-center" style={{ background: m.bg, border: `1px solid ${m.border}` }}>
-              <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{m.label}</div>
-              <div className="text-sm font-bold font-mono mt-0.5" style={{ color: m.color }}>{m.val}</div>
-            </div>
-          ))}
+        {/* Objects Selector */}
+        <div className="bg-[#0F172A] border border-cyan-500/20 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
+          <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold">Select Object</h3>
+          <div className="flex gap-2">
+            {(Object.keys(OBJECTS) as Array<keyof typeof OBJECTS>).map(k => (
+              <button
+                key={k}
+                onClick={() => setObj(k)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${uiState.objectType === k ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50' : 'bg-slate-800 text-slate-400 border border-transparent hover:bg-slate-700'}`}
+              >
+                {OBJECTS[k].label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-auto pt-2 flex justify-between items-center text-xs text-slate-500 border-t border-slate-800">
+            <span>True Diameter:</span>
+            <span className="font-mono text-slate-300">{OBJECTS[uiState.objectType].diameter.toFixed(2)} cm</span>
+          </div>
         </div>
+
+        {/* Controls */}
+        <div className="bg-[#0F172A] border border-cyan-500/20 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
+          <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold">Controls</h3>
+          <div className="grid grid-cols-2 gap-3 flex-grow">
+            <button
+              onClick={() => { simState.current.isLocked = !simState.current.isLocked; updateUI(); }}
+              className={`flex items-center justify-center gap-2 rounded-lg border ${uiState.isLocked ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'} transition-all`}
+            >
+              {uiState.isLocked ? '🔒 Locked' : '🔓 Unlocked'}
+            </button>
+            <button
+              onClick={reset}
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/50 transition-all"
+            >
+              🔄 Reset
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 text-center mt-2">
+            Drag the movable jaw to measure.
+          </p>
+        </div>
+
+        {/* Readings */}
+        <div className="bg-[#0F172A] border border-cyan-500/20 rounded-xl p-4 shadow-lg flex flex-col justify-between">
+          <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Measurement</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="bg-slate-800/50 rounded p-2 flex justify-between">
+              <span className="text-slate-500">MSR</span>
+              <span className="font-mono text-cyan-400">{uiState.msr.toFixed(1)}</span>
+            </div>
+            <div className="bg-slate-800/50 rounded p-2 flex justify-between">
+              <span className="text-slate-500">VSD</span>
+              <span className="font-mono text-cyan-400">{uiState.vsd}</span>
+            </div>
+            <div className="bg-slate-800/50 rounded p-2 flex justify-between">
+              <span className="text-slate-500">LC</span>
+              <span className="font-mono text-slate-400">0.01</span>
+            </div>
+            <div className="bg-cyan-950/50 border border-cyan-900 rounded p-2 flex justify-between font-bold">
+              <span className="text-cyan-600">Total</span>
+              <span className="font-mono text-emerald-400">{uiState.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
-};
-
-export default VernierCalipersLab;
+}

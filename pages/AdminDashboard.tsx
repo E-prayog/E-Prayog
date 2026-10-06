@@ -9,13 +9,15 @@ import {
 import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth as getFirebaseAuth, signOut as fbSignOut } from 'firebase/auth';
 import GlassCard from '../components/GlassCard';
-import { ShieldCheck, Users, BookOpen, MessageSquare, Key, Activity, Search, Plus, Loader2, X, CheckCircle2, Clock, Eye, Trash2, UserPlus, BarChart3, RefreshCw, Star, Flame } from 'lucide-react';
+import AdminQuizDesigner from '../components/admin/AdminQuizDesigner';
+import { ShieldCheck, Users, BookOpen, MessageSquare, Key, Activity, Search, Plus, Loader2, X, CheckCircle2, Clock, Eye, Trash2, UserPlus, BarChart3, RefreshCw, Star, Flame, Brain } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 
-type Tab = 'overview' | 'teachers' | 'students' | 'feedback' | 'resets' | 'activity';
+type Tab = 'overview' | 'quizzes' | 'teachers' | 'students' | 'feedback' | 'resets' | 'activity';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview', icon: <BarChart3 size={16} /> },
+  { id: 'quizzes', label: 'Quiz Designer', icon: <Brain size={16} /> },
   { id: 'teachers', label: 'Teachers', icon: <BookOpen size={16} /> },
   { id: 'students', label: 'Students', icon: <Users size={16} /> },
   { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={16} /> },
@@ -234,6 +236,9 @@ const AdminDashboard: React.FC = () => {
           </GlassCard>
         </div>
       )}
+
+      {/* ── Quizzes / Quiz Designer Tab ── */}
+      {tab === 'quizzes' && <AdminQuizDesigner />}
 
       {/* ── Teachers Tab ── */}
       {tab === 'teachers' && (

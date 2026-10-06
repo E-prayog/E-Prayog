@@ -3,10 +3,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Sparkles, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-// Consolidated Single Accent Color Family (Cyan/Teal)
-const CYAN_PRIMARY = '#06B6D4'; // Primary Accent
-const CYAN_BRIGHT = '#22D3EE';  // Bright Highlight
-const CYAN_GLOW = '#67E8F9';    // Emissive Light Tint
+// Restrained Color System Accent Token
+const SKY_BLUE = '#38BDF8';
 
 interface AtomModelProps {
   isMobile: boolean;
@@ -30,14 +28,14 @@ function AtomModel({ isMobile }: AtomModelProps) {
   useFrame((state, delta) => {
     // Ambient slow idle rotation of the entire atom assembly
     if (atomGroupRef.current) {
-      atomGroupRef.current.rotation.y += delta * 0.15;
-      atomGroupRef.current.rotation.x += delta * 0.04;
+      atomGroupRef.current.rotation.y += delta * 0.12;
+      atomGroupRef.current.rotation.x += delta * 0.03;
     }
 
     // Nucleus subtle rotation & breathing pulse
     if (nucleusRef.current) {
-      nucleusRef.current.rotation.y -= delta * 0.3;
-      const pulse = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.04;
+      nucleusRef.current.rotation.y -= delta * 0.25;
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.03;
       nucleusRef.current.scale.setScalar(pulse);
     }
 
@@ -45,7 +43,7 @@ function AtomModel({ isMobile }: AtomModelProps) {
 
     // Electron 1 on Ring 1 (Radius 2.0)
     if (electron1Ref.current) {
-      const angle1 = t * 1.6;
+      const angle1 = t * 1.4;
       electron1Ref.current.position.x = Math.cos(angle1) * RADIUS_1;
       electron1Ref.current.position.y = Math.sin(angle1) * RADIUS_1;
       electron1Ref.current.position.z = 0;
@@ -53,7 +51,7 @@ function AtomModel({ isMobile }: AtomModelProps) {
 
     // Electron 2 on Ring 2 (Radius 2.7)
     if (electron2Ref.current) {
-      const angle2 = t * 1.2 + 2.1;
+      const angle2 = t * 1.0 + 2.1;
       electron2Ref.current.position.x = Math.cos(angle2) * RADIUS_2;
       electron2Ref.current.position.y = Math.sin(angle2) * RADIUS_2;
       electron2Ref.current.position.z = 0;
@@ -61,14 +59,14 @@ function AtomModel({ isMobile }: AtomModelProps) {
 
     // Electron 3 on Ring 3 (Radius 3.4)
     if (electron3Ref.current) {
-      const angle3 = t * 0.9 + 4.3;
+      const angle3 = t * 0.8 + 4.3;
       electron3Ref.current.position.x = Math.cos(angle3) * RADIUS_3;
       electron3Ref.current.position.y = Math.sin(angle3) * RADIUS_3;
       electron3Ref.current.position.z = 0;
     }
 
-    // Camera mouse parallax smooth damp (gentle on mobile)
-    const dampFactor = isMobile ? 0.2 : 0.4;
+    // Camera mouse parallax smooth damp
+    const dampFactor = isMobile ? 0.15 : 0.3;
     const pointerX = state.pointer.x * dampFactor;
     const pointerY = state.pointer.y * dampFactor;
     state.camera.position.x += (pointerX - state.camera.position.x) * 0.04;
@@ -76,51 +74,42 @@ function AtomModel({ isMobile }: AtomModelProps) {
     state.camera.lookAt(0, 0, 0);
   });
 
-  // Scale down and adjust vertical offset on mobile
   const scale = isMobile ? 0.65 : 1.0;
   const positionY = isMobile ? -0.2 : 0;
 
   return (
     <group ref={atomGroupRef} scale={scale} position={[0, positionY, 0]}>
-      {/* Central Nucleus: Low-poly Icosahedron with cyan emissive glow */}
+      {/* Central Nucleus: Clean Wireframe Icosahedron */}
       <mesh ref={nucleusRef}>
         <icosahedronGeometry args={[0.45, 1]} />
-        <meshStandardMaterial
-          color={CYAN_BRIGHT}
-          emissive={CYAN_PRIMARY}
-          emissiveIntensity={1.0}
+        <meshBasicMaterial
+          color={SKY_BLUE}
           wireframe
-          roughness={0.2}
-          metalness={0.8}
+          transparent
+          opacity={0.7}
         />
       </mesh>
 
-      {/* Nucleus Core Ambient Glow */}
+      {/* Nucleus Core Sphere */}
       <mesh>
-        <sphereGeometry args={[0.28, 16, 16]} />
-        <meshBasicMaterial color={CYAN_GLOW} transparent opacity={0.45} />
+        <sphereGeometry args={[0.26, 16, 16]} />
+        <meshBasicMaterial color={SKY_BLUE} transparent opacity={0.25} />
       </mesh>
 
       {/* ── Orbit Ring 1 (Tilted Group 1) ── */}
       <group rotation={[0.4, 0.2, 0.8]}>
         <mesh>
           <torusGeometry args={[RADIUS_1, 0.012, 16, 100]} />
-          <meshStandardMaterial
-            color={CYAN_BRIGHT}
-            emissive={CYAN_PRIMARY}
-            emissiveIntensity={0.6}
+          <meshBasicMaterial
+            color={SKY_BLUE}
             transparent
-            opacity={0.55}
+            opacity={0.5}
           />
         </mesh>
         {/* Electron 1 */}
         <mesh ref={electron1Ref}>
-          <sphereGeometry args={[0.08, 16, 16]} />
-          <meshStandardMaterial
-            color={CYAN_GLOW}
-            emissive={CYAN_BRIGHT}
-            emissiveIntensity={2.5}
-          />
+          <sphereGeometry args={[0.075, 16, 16]} />
+          <meshBasicMaterial color={SKY_BLUE} />
         </mesh>
       </group>
 
@@ -128,22 +117,16 @@ function AtomModel({ isMobile }: AtomModelProps) {
       <group rotation={[-0.6, 0.5, -0.4]}>
         <mesh>
           <torusGeometry args={[RADIUS_2, 0.012, 16, 100]} />
-          <meshStandardMaterial
-            color={CYAN_PRIMARY}
-            emissive={CYAN_PRIMARY}
-            emissiveIntensity={0.4}
+          <meshBasicMaterial
+            color={SKY_BLUE}
             transparent
-            opacity={0.4}
+            opacity={0.35}
           />
         </mesh>
         {/* Electron 2 */}
         <mesh ref={electron2Ref}>
-          <sphereGeometry args={[0.085, 16, 16]} />
-          <meshStandardMaterial
-            color={CYAN_GLOW}
-            emissive={CYAN_BRIGHT}
-            emissiveIntensity={2.5}
-          />
+          <sphereGeometry args={[0.08, 16, 16]} />
+          <meshBasicMaterial color={SKY_BLUE} />
         </mesh>
       </group>
 
@@ -151,22 +134,16 @@ function AtomModel({ isMobile }: AtomModelProps) {
       <group rotation={[0.9, -0.3, 0.2]}>
         <mesh>
           <torusGeometry args={[RADIUS_3, 0.012, 16, 100]} />
-          <meshStandardMaterial
-            color={CYAN_PRIMARY}
-            emissive={CYAN_PRIMARY}
-            emissiveIntensity={0.3}
+          <meshBasicMaterial
+            color={SKY_BLUE}
             transparent
-            opacity={0.25}
+            opacity={0.2}
           />
         </mesh>
         {/* Electron 3 */}
         <mesh ref={electron3Ref}>
-          <sphereGeometry args={[0.08, 16, 16]} />
-          <meshStandardMaterial
-            color={CYAN_GLOW}
-            emissive={CYAN_BRIGHT}
-            emissiveIntensity={2.5}
-          />
+          <sphereGeometry args={[0.075, 16, 16]} />
+          <meshBasicMaterial color={SKY_BLUE} />
         </mesh>
       </group>
     </group>
@@ -199,7 +176,6 @@ export default function AtomSceneR3F() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
 
-    // Pause rendering when canvas is out of view for performance
     const observer = new IntersectionObserver(
       ([entry]) => setIsInView(entry.isIntersecting),
       { threshold: 0.05 }
@@ -215,10 +191,9 @@ export default function AtomSceneR3F() {
     };
   }, []);
 
-  // WebGL Fallback: CSS ambient gradient
   if (!webglSupported) {
     return (
-      <div className="absolute inset-0 z-0 bg-gradient-to-b from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0B1120] via-transparent to-transparent pointer-events-none" />
     );
   }
 
@@ -232,13 +207,12 @@ export default function AtomSceneR3F() {
       >
         <PerspectiveCamera makeDefault position={isMobile ? [0, 0, 8.5] : [0, 0, 7.5]} fov={50} />
         
-        {/* Unified Cyan Lighting System */}
-        <ambientLight intensity={0.5} />
-        <pointLight position={[5, 5, 5]} intensity={1.5} color={CYAN_BRIGHT} />
-        <pointLight position={[-5, -5, -3]} intensity={0.8} color={CYAN_PRIMARY} />
+        {/* Soft Ambient & Directional Lighting — neutral white, no colour cast */}
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[5, 5, 5]} intensity={0.5} color="#ffffff" />
         
-        {/* Sparse ambient depth sparkles in Cyan (reduced density on mobile) */}
-        <Sparkles count={isMobile ? 24 : 45} scale={10} size={1.8} speed={0.4} opacity={0.35} color={CYAN_BRIGHT} />
+        {/* Subtle Ambient Sparkles */}
+        <Sparkles count={isMobile ? 20 : 35} scale={10} size={1.2} speed={0.3} opacity={0.18} color="#94A3B8" />
 
         {/* 3D Atom Geometry */}
         <AtomModel isMobile={isMobile} />
