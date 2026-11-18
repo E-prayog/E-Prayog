@@ -29,45 +29,49 @@ const Subjects: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-6 md:px-12 lg:px-20">
+    <div className="min-h-screen pt-24 pb-20 px-6 md:px-12 lg:px-20 bg-ink text-paper">
       <div className="max-w-6xl mx-auto">
-        <MotionDiv initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <h1 className="text-3xl md:text-5xl font-display font-semibold text-white mb-4">
+        <MotionDiv initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-16">
+          <span className="text-xs font-mono uppercase tracking-[0.2em] text-chalk block mb-2">PUC Practicals</span>
+          <h1 className="text-3xl md:text-5xl font-display font-normal text-paper mb-3">
             {t.subjectsTitle}
           </h1>
-          <p className="text-zinc-400 max-w-2xl mx-auto">
+          <p className="text-chalk max-w-xl mx-auto text-sm leading-relaxed">
             {t.subjectsDesc}
           </p>
         </MotionDiv>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {SUBJECTS.map((subject, idx) => {
             const Icon = icons[idx] || Zap;
             const translatedName = subjectNameMap[subject.id] || subject.name;
             const translatedDesc = subjectDescMap[subject.id] || subject.description;
             return (
-              <Link key={subject.id} to={`/subjects/${subject.id}`}>
-                <GlassCard color={subject.color} className="h-full">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="size-14 rounded-2xl flex items-center justify-center" style={{ background: `${subject.hex}15` }}>
-                      <Icon size={28} style={{ color: subject.hex }} />
+              <Link key={subject.id} to={`/subjects/${subject.id}`} className="group">
+                <GlassCard color={subject.color} className="h-full flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="size-11 rounded-[2px] bg-ink border border-rule-dark flex items-center justify-center text-verdigris">
+                        <Icon size={20} />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-display font-normal text-paper group-hover:text-verdigris transition-colors">{translatedName}</h2>
+                        <span className="text-xs font-mono text-chalk">
+                          {subject.labs.length} {t.subjectsExperiments}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">{translatedName}</h2>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${subject.hex}15`, color: subject.hex }}>
-                        {subject.labs.length} {t.subjectsExperiments}
-                      </span>
+                    <p className="text-xs text-chalk mb-5 leading-relaxed">{translatedDesc}</p>
+                    <div className="flex flex-wrap gap-1.5 mb-6">
+                      {subject.labs.slice(0, 3).map(lab => (
+                        <span key={lab.id} className="text-[11px] font-mono text-chalk/80 bg-ink border border-rule-dark rounded-[2px] px-2 py-0.5">{lab.title}</span>
+                      ))}
+                      {subject.labs.length > 3 && <span className="text-[11px] font-mono text-chalk/60 px-1 py-0.5">+{subject.labs.length - 3}</span>}
                     </div>
                   </div>
-                  <p className="text-sm text-zinc-400 mb-4 leading-relaxed">{translatedDesc}</p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {subject.labs.slice(0, 4).map(lab => (
-                      <span key={lab.id} className="text-xs text-zinc-500 bg-white/5 rounded-full px-2 py-0.5">{lab.title}</span>
-                    ))}
-                    {subject.labs.length > 4 && <span className="text-xs text-zinc-600">+{subject.labs.length - 4} {t.subjectsMore}</span>}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm font-bold" style={{ color: subject.hex }}>
-                    {t.subjectsExplore} <ArrowRight size={16} />
+                  <div className="flex items-center gap-2 text-xs font-mono font-medium text-verdigris group-hover:underline">
+                    <span>{t.subjectsExplore}</span>
+                    <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
                   </div>
                 </GlassCard>
               </Link>

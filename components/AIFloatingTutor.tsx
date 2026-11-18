@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Send, Bot, X, Sparkles, User, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, Bot, X, Sparkles, User, Maximize2, Minimize2, MapPin } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { SUBJECTS } from '../constants';
 import { createChatSession, sendMessageToGemini, ChatSession } from '../services/geminiService';
@@ -266,7 +266,10 @@ const AIFloatingTutor: React.FC = () => {
                     <Sparkles size={12} className="text-amber-400 animate-pulse flex-shrink-0" />
                   </h2>
                   {labContext ? (
-                    <p className="text-[10px] font-mono truncate" style={{ color: '#a78bfa' }}>📍 {labContext.labTitle}</p>
+                    <p className="text-[10px] font-mono truncate flex items-center gap-1" style={{ color: '#a78bfa' }}>
+                      <MapPin size={10} className="shrink-0" />
+                      <span>{labContext.labTitle}</span>
+                    </p>
                   ) : (
                     <p className="text-[10px] font-mono" style={{ color: 'rgba(167,139,250,0.6)' }}>{t.aiGeneral}</p>
                   )}

@@ -7,19 +7,11 @@ import { m as motion } from 'framer-motion';
 import { SUBJECTS, findLabById, getSubjectLabIds, SUBJECT_LAB_COUNTS } from '../constants';
 
 const SUBJECT_ICONS: Record<string, React.ReactNode> = {
-  physics: <Zap size={24} />,
-  chemistry: <FlaskConical size={24} />,
-  biology: <Dna size={24} />,
-  math: <Calculator size={24} />,
-  cs: <Monitor size={24} />,
-};
-
-const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: string; bar: string }> = {
-  physics: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', bar: 'bg-emerald-500' },
-  chemistry: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', bar: 'bg-orange-500' },
-  biology: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', bar: 'bg-purple-500' },
-  math: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', bar: 'bg-blue-500' },
-  cs: { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', bar: 'bg-pink-500' },
+  physics: <Zap size={22} />,
+  chemistry: <FlaskConical size={22} />,
+  biology: <Dna size={22} />,
+  math: <Calculator size={22} />,
+  cs: <Monitor size={22} />,
 };
 
 const StudentDashboard: React.FC = () => {
@@ -42,8 +34,8 @@ const StudentDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="pt-24 min-h-screen flex items-center justify-center">
-        <div className="size-12 border-3 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+      <div className="pt-24 min-h-screen flex items-center justify-center bg-ink">
+        <div className="size-10 border-2 border-chalk/20 border-t-verdigris rounded-full animate-spin" />
       </div>
     );
   }
@@ -51,155 +43,190 @@ const StudentDashboard: React.FC = () => {
   if (!user) { navigate('/login'); return null; }
 
   return (
-    <div className="pt-24 pb-12 px-6 lg:px-12 max-w-7xl mx-auto min-h-screen">
+    <div className="pt-24 pb-16 px-6 lg:px-12 max-w-7xl mx-auto min-h-screen bg-ink text-paper">
       {/* Welcome Header */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-10 pb-6 border-b border-rule-dark flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl lg:text-4xl font-display font-semibold text-white mb-2">
-            Welcome back, <span className="text-emerald-400">{displayName.split(' ')[0]}</span>!
+          <span className="text-xs font-mono uppercase tracking-[0.2em] text-chalk block mb-2">Student Dashboard</span>
+          <h1 className="text-3xl lg:text-4xl font-display font-normal text-paper mb-2 tracking-tight">
+            Welcome back, <span className="text-verdigris">{displayName.split(' ')[0]}</span>
           </h1>
-          <p className="text-zinc-400">Continue your learning journey. You've completed {overallProgress}% overall.</p>
+          <p className="text-sm text-chalk">Continue your coursework. You have completed {overallProgress}% of the syllabus.</p>
         </div>
         {/* Streak badge */}
-        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/20 shrink-0">
-          <Flame size={22} className="text-orange-400" />
+        <div className="flex items-center gap-3 px-4 py-2 rounded-[2px] bg-ink-2 border border-rule-dark shrink-0">
+          <Flame size={20} className="text-brass" />
           <div>
-            <p className="text-lg font-bold text-white leading-tight">{streak} day{streak !== 1 ? 's' : ''}</p>
-            <p className="text-[10px] text-orange-400/70 font-bold uppercase">Streak</p>
+            <p className="text-base font-mono font-bold text-paper leading-tight">{streak} day{streak !== 1 ? 's' : ''}</p>
+            <p className="text-[10px] text-chalk font-mono uppercase tracking-wider">Streak</p>
           </div>
         </div>
       </div>
 
       {/* Quick Access Tools */}
-      <section className="mb-8">
-        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-4">Quick Access</h3>
-        <div className="grid grid-cols-4 md:grid-cols-7 gap-3">
+      <section className="mb-10">
+        <h3 className="text-xs font-mono text-chalk uppercase tracking-widest mb-4">Quick References & Tools</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
           {[
-            { id: 'formula', label: 'Formula Sheet', icon: Sigma, color: '#3b82f6', bg: 'rgba(59,130,246,0.15)', path: '/tools/formula-sheet' },
-            { id: 'logic', label: 'Logic Gates', icon: Cpu, color: '#a855f7', bg: 'rgba(168,85,247,0.15)', path: '/tools/logic-gates' },
-            { id: 'periodic', label: 'Periodic Table', icon: Table2, color: '#10b981', bg: 'rgba(16,185,129,0.15)', path: '/tools/periodic-table' },
-            { id: 'constants', label: 'Constants', icon: Hash, color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', path: '/tools/constants' },
-            { id: 'calc', label: 'Calculator', icon: Calculator, color: '#ec4899', bg: 'rgba(236,72,153,0.15)', path: '/tools/calculator' },
-            { id: 'safety', label: 'Safety Guide', icon: ShieldCheck, color: '#ef4444', bg: 'rgba(239,68,68,0.15)', path: '/tools/safety-guide' },
-            { id: 'bio', label: 'Bio Diagrams', icon: Microscope, color: '#22c55e', bg: 'rgba(34,197,94,0.15)', path: '/tools/bio-diagrams' },
+            { id: 'formula', label: 'Formula Sheet', icon: Sigma, path: '/tools/formula-sheet' },
+            { id: 'logic', label: 'Logic Gates', icon: Cpu, path: '/tools/logic-gates' },
+            { id: 'periodic', label: 'Periodic Table', icon: Table2, path: '/tools/periodic-table' },
+            { id: 'constants', label: 'Constants', icon: Hash, path: '/tools/constants' },
+            { id: 'calc', label: 'Calculator', icon: Calculator, path: '/tools/calculator' },
+            { id: 'safety', label: 'Safety Guide', icon: ShieldCheck, path: '/tools/safety-guide' },
+            { id: 'bio', label: 'Bio Diagrams', icon: Microscope, path: '/tools/bio-diagrams' },
           ].map(tool => (
-            <Link key={tool.id} to={tool.path}>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                className="rounded-2xl p-4 flex flex-col items-center gap-3 cursor-pointer bg-zinc-900/60 border border-white/5 hover:border-white/15 transition-all h-full">
-                <div className="size-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: tool.bg }}>
-                  <tool.icon size={22} style={{ color: tool.color }} />
+            <Link key={tool.id} to={tool.path} className="group">
+              <div className="rounded-[4px] p-3.5 flex flex-col items-center gap-2.5 bg-ink-2 border border-rule-dark hover:border-chalk/40 transition-colors h-full text-center">
+                <div className="size-10 rounded-[2px] flex items-center justify-center bg-ink border border-rule-dark text-chalk group-hover:text-verdigris transition-colors">
+                  <tool.icon size={18} />
                 </div>
-                <span className="text-white text-xs font-semibold text-center leading-tight">{tool.label}</span>
-              </motion.div>
+                <span className="text-paper text-xs font-medium leading-tight">{tool.label}</span>
+              </div>
             </Link>
           ))}
         </div>
       </section>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <GlassCard hoverEffect={false} className="p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20"><TrendingUp size={20} className="text-emerald-400" /></div>
-            <div><div className="text-2xl font-display font-bold text-white">{overallProgress}%</div><div className="text-xs text-zinc-400 font-medium">Overall Progress</div></div>
+            <div className="p-2.5 rounded-[2px] bg-ink border border-rule-dark text-verdigris"><TrendingUp size={18} /></div>
+            <div>
+              <div className="text-2xl font-mono font-semibold text-paper">{overallProgress}%</div>
+              <div className="text-xs text-chalk font-mono uppercase tracking-wider">Overall Progress</div>
+            </div>
           </div>
         </GlassCard>
         <GlassCard hoverEffect={false} className="p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20"><FlaskConical size={20} className="text-blue-400" /></div>
-            <div><div className="text-2xl font-display font-bold text-white">{completedLabs.length}</div><div className="text-xs text-zinc-400 font-medium">Labs Completed</div></div>
+            <div className="p-2.5 rounded-[2px] bg-ink border border-rule-dark text-verdigris"><FlaskConical size={18} /></div>
+            <div>
+              <div className="text-2xl font-mono font-semibold text-paper">{completedLabs.length}</div>
+              <div className="text-xs text-chalk font-mono uppercase tracking-wider">Labs Completed</div>
+            </div>
           </div>
         </GlassCard>
         <GlassCard hoverEffect={false} className="p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20"><BookOpen size={20} className="text-purple-400" /></div>
-            <div><div className="text-2xl font-display font-bold text-white">5</div><div className="text-xs text-zinc-400 font-medium">Subjects</div></div>
+            <div className="p-2.5 rounded-[2px] bg-ink border border-rule-dark text-brass"><BookOpen size={18} /></div>
+            <div>
+              <div className="text-2xl font-mono font-semibold text-paper">5</div>
+              <div className="text-xs text-chalk font-mono uppercase tracking-wider">Subjects</div>
+            </div>
           </div>
         </GlassCard>
         <GlassCard hoverEffect={false} className="p-5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20"><GraduationCap size={20} className="text-amber-400" /></div>
-            <div><div className="text-2xl font-display font-bold text-white">{grade || 'PUC'}</div><div className="text-xs text-zinc-400 font-medium">Your Grade</div></div>
+            <div className="p-2.5 rounded-[2px] bg-ink border border-rule-dark text-brass"><GraduationCap size={18} /></div>
+            <div>
+              <div className="text-2xl font-mono font-semibold text-paper">{grade || 'PUC'}</div>
+              <div className="text-xs text-chalk font-mono uppercase tracking-wider">Grade Level</div>
+            </div>
           </div>
         </GlassCard>
       </div>
 
       {/* Continue Learning + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
         <div className="lg:col-span-2">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2"><Clock size={20} className="text-emerald-400" /> Continue Learning</h2>
-          <GlassCard hoverEffect={false} className="p-6 relative overflow-hidden">
-            <div className="absolute -top-16 -right-16 size-48 bg-emerald-500/5 blur-3xl rounded-full"></div>
+          <h2 className="text-lg font-display text-paper mb-4 flex items-center gap-2">
+            <Clock size={18} className="text-verdigris" />
+            <span>Continue Learning</span>
+          </h2>
+          <GlassCard hoverEffect={false} className="p-6">
             {recentLabData ? (
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm text-zinc-400 mb-1">Last experiment</p>
-                  <h3 className="text-lg font-semibold text-white mb-2">{recentLabData.lab.title}</h3>
-                  <p className="text-xs text-zinc-500 capitalize">{recentLabData.subject.name}</p>
+                  <p className="text-xs font-mono uppercase tracking-wider text-chalk mb-1">Last experiment</p>
+                  <h3 className="text-xl font-display text-paper mb-1">{recentLabData.lab.title}</h3>
+                  <p className="text-xs text-chalk font-mono capitalize">{recentLabData.subject.name}</p>
                 </div>
-                <Link to={`/subjects/${recentLabData.subject.id}/${recentLabData.lab.id}`}
-                  className="shrink-0 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors flex items-center gap-2">
-                  Continue <ArrowRight size={16} />
+                <Link
+                  to={`/subjects/${recentLabData.subject.id}/${recentLabData.lab.id}`}
+                  className="shrink-0 px-5 py-2.5 rounded-[2px] bg-verdigris hover:bg-verdigris-deep text-paper text-sm font-medium transition-colors flex items-center gap-2 self-start sm:self-auto"
+                >
+                  <span>Continue</span>
+                  <ArrowRight size={14} />
                 </Link>
               </div>
             ) : (
-              <div className="flex flex-col items-center text-center py-4">
-                <FlaskConical className="text-zinc-600 mb-4" size={40} />
-                <p className="text-zinc-400 mb-4">You haven't started any experiments yet.</p>
-                <Link to="/subjects" className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors flex items-center gap-2">
-                  Explore Labs <ArrowRight size={16} />
+              <div className="flex flex-col items-center text-center py-6">
+                <FlaskConical className="text-chalk/40 mb-3" size={36} />
+                <p className="text-chalk text-sm mb-4">No unfinished practicals found.</p>
+                <Link
+                  to="/subjects"
+                  className="px-5 py-2.5 rounded-[2px] bg-verdigris hover:bg-verdigris-deep text-paper text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <span>Explore Labs</span>
+                  <ArrowRight size={14} />
                 </Link>
               </div>
             )}
           </GlassCard>
         </div>
+
         <div>
-          <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
+          <h2 className="text-lg font-display text-paper mb-4">Quick Actions</h2>
           <div className="space-y-3">
-            <Link to="/subjects" className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group">
-              <FlaskConical size={20} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="text-white font-medium">Browse All Labs</span>
-              <ArrowRight size={16} className="ml-auto text-zinc-500 group-hover:text-white transition-colors" />
+            <Link
+              to="/subjects"
+              className="flex items-center gap-3 p-4 rounded-[4px] bg-ink-2 hover:bg-ink-2/80 border border-rule-dark transition-colors group"
+            >
+              <FlaskConical size={18} className="text-verdigris" />
+              <span className="text-paper text-sm font-medium">Browse All Labs</span>
+              <ArrowRight size={14} className="ml-auto text-chalk group-hover:text-paper transition-colors" />
             </Link>
-            <Link to="/tutor" className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group">
-              <Zap size={20} className="text-amber-400 group-hover:scale-110 transition-transform" />
-              <span className="text-white font-medium">Ask AI Tutor</span>
-              <ArrowRight size={16} className="ml-auto text-zinc-500 group-hover:text-white transition-colors" />
+            <Link
+              to="/tutor"
+              className="flex items-center gap-3 p-4 rounded-[4px] bg-ink-2 hover:bg-ink-2/80 border border-rule-dark transition-colors group"
+            >
+              <Zap size={18} className="text-brass" />
+              <span className="text-paper text-sm font-medium">Ask AI Tutor</span>
+              <ArrowRight size={14} className="ml-auto text-chalk group-hover:text-paper transition-colors" />
             </Link>
-            <Link to="/profile" className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group">
-              <GraduationCap size={20} className="text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="text-white font-medium">Edit Profile</span>
-              <ArrowRight size={16} className="ml-auto text-zinc-500 group-hover:text-white transition-colors" />
+            <Link
+              to="/profile"
+              className="flex items-center gap-3 p-4 rounded-[4px] bg-ink-2 hover:bg-ink-2/80 border border-rule-dark transition-colors group"
+            >
+              <GraduationCap size={18} className="text-chalk" />
+              <span className="text-paper text-sm font-medium">Account Settings</span>
+              <ArrowRight size={14} className="ml-auto text-chalk group-hover:text-paper transition-colors" />
             </Link>
           </div>
         </div>
       </div>
 
       {/* Subject Progress Cards */}
-      <h2 className="text-xl font-semibold text-white mb-4">Subject Progress</h2>
+      <h2 className="text-lg font-display text-paper mb-4">Subject Progress</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {SUBJECTS.map(subject => {
           const subjectId = subject.id;
-          const styles = SUBJECT_COLORS[subjectId] || SUBJECT_COLORS.physics;
           const percentage = Math.min(100, Math.max(0, progress[subjectId] || 0));
           const subjectLabIds = getSubjectLabIds(subjectId);
           const completedCount = completedLabs.filter(id => subjectLabIds.includes(id)).length;
           const totalLabs = SUBJECT_LAB_COUNTS[subjectId] || subject.labs.length;
 
           return (
-            <Link to={`/subjects/${subjectId}`} key={subjectId}>
+            <Link to={`/subjects/${subjectId}`} key={subjectId} className="block group">
               <GlassCard className="p-5 h-full">
-                <div className={`p-2.5 rounded-xl ${styles.bg} border ${styles.border} w-fit mb-3`}>
-                  {SUBJECT_ICONS[subjectId] || <FlaskConical size={24} />}
+                <div className="p-2.5 rounded-[2px] bg-ink border border-rule-dark text-verdigris w-fit mb-3">
+                  {SUBJECT_ICONS[subjectId] || <FlaskConical size={20} />}
                 </div>
-                <h3 className="text-white font-semibold capitalize mb-1">{subject.name}</h3>
-                <p className="text-xs text-zinc-400 mb-3">{completedCount}/{totalLabs} experiments</p>
-                <div className="w-full h-2 bg-black/30 rounded-full overflow-hidden border border-white/5 mb-1">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${percentage}%` }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                    className={`h-full ${styles.bar} opacity-80`} />
+                <h3 className="font-display text-lg text-paper font-normal capitalize mb-1 group-hover:text-verdigris transition-colors">
+                  {subject.name}
+                </h3>
+                <p className="text-xs font-mono text-chalk mb-4">{completedCount}/{totalLabs} completed</p>
+                <div className="w-full h-1.5 bg-ink rounded-full overflow-hidden border border-rule-dark mb-2">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full bg-verdigris"
+                  />
                 </div>
-                <div className={`text-right text-xs font-mono font-bold ${styles.text}`}>{percentage}%</div>
+                <div className="text-right text-xs font-mono font-medium text-chalk">{percentage}%</div>
               </GlassCard>
             </Link>
           );

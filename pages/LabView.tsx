@@ -257,39 +257,41 @@ const LabView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 lg:px-16">
+    <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 lg:px-16 bg-ink text-paper">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <Link to={`/subjects/${subject.id}`} className="text-sm text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-1 mb-3">
+        <div className="mb-8 pb-6 border-b border-rule-dark">
+          <Link to={`/subjects/${subject.id}`} className="text-xs font-mono text-chalk hover:text-paper transition-colors flex items-center gap-1.5 mb-3">
             <ArrowLeft size={14} /> {t.labBackTo} {subject.name}
           </Link>
-          <div className="flex items-center gap-3">
-            <EprayogLogo size={52} idSuffix={lab.id} />
+          <div className="flex items-center gap-4">
+            <div className="bg-ink p-1 rounded-[2px] border border-rule-dark">
+              <EprayogLogo size={44} idSuffix={lab.id} />
+            </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-display font-semibold text-white">{lab.title}</h1>
-              <p className="text-sm text-zinc-400">{lab.category} • {lab.difficulty} • {lab.duration}</p>
+              <h1 className="text-2xl md:text-3xl font-display font-normal text-paper tracking-tight">{lab.title}</h1>
+              <p className="text-xs font-mono text-chalk mt-1">{lab.category} • {lab.difficulty} • {lab.duration}</p>
             </div>
           </div>
         </div>
 
         {/* Step Indicator (numbered tabs) */}
-        <div className="flex gap-1 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-1.5 mb-8 overflow-x-auto pb-2 border-b border-rule-dark">
           {TABS.map((tab, idx) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setTabIdx(idx)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-[2px] text-xs font-mono whitespace-nowrap transition-colors border
                 ${tabIdx === idx
-                  ? 'bg-white/10 text-white border-white/20 shadow-lg'
+                  ? 'bg-ink-2 text-paper border-rule-dark underline underline-offset-4 decoration-verdigris font-medium'
                   : tabIdx > idx
-                    ? 'text-emerald-400/60 border-emerald-500/10 bg-emerald-500/5'
-                    : 'text-zinc-500 border-transparent hover:text-white hover:bg-white/5'
+                    ? 'text-verdigris border-rule-dark/50 bg-ink hover:text-paper'
+                    : 'text-chalk border-transparent hover:text-paper hover:bg-ink-2'
                 }`}
             >
-              <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                tabIdx === idx ? 'bg-white/20 text-white' : tabIdx > idx ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'
+              <span className={`size-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold flex-shrink-0 ${
+                tabIdx === idx ? 'bg-verdigris text-paper' : tabIdx > idx ? 'text-verdigris' : 'text-chalk/60'
               }`}>
                 {tabIdx > idx ? '✓' : idx + 1}
               </span>
@@ -782,27 +784,26 @@ const LabView: React.FC = () => {
         </MotionDiv>
 
         {/* Navigation: Previous / Next */}
-        <div className="flex items-center justify-between mt-8 max-w-4xl">
+        <div className="flex items-center justify-between mt-10 max-w-4xl pt-6 border-t border-rule-dark">
           <button
             type="button"
             onClick={goPrev}
             disabled={tabIdx === 0}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold transition-all hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] bg-ink-2 border border-rule-dark text-xs font-mono font-medium text-paper transition-colors hover:bg-ink disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            <ChevronLeft size={16} /> {tabIdx > 0 ? TABS[tabIdx - 1].label : t.labPrevious}
+            <ChevronLeft size={14} /> {tabIdx > 0 ? TABS[tabIdx - 1].label : t.labPrevious}
           </button>
 
-          <span className="text-xs text-zinc-500 font-mono">
+          <span className="text-xs text-chalk font-mono">
             {tabIdx + 1} / {TABS.length}
           </span>
 
           <button
             type="button"
             onClick={goNext}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 disabled:opacity-20 disabled:cursor-not-allowed"
-            style={{ background: `${subject.hex}20`, color: subject.hex, borderColor: `${subject.hex}30`, borderWidth: 1 }}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-[2px] bg-verdigris hover:bg-verdigris-deep text-paper text-xs font-mono font-medium transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            {tabIdx < TABS.length - 1 ? TABS[tabIdx + 1].label : t.labFinish} <ChevronRight size={16} />
+            {tabIdx < TABS.length - 1 ? TABS[tabIdx + 1].label : t.labFinish} <ChevronRight size={14} />
           </button>
         </div>
       </div>

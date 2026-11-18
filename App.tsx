@@ -2,12 +2,15 @@ import React, { lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './services/AuthContext';
 import { LanguageProvider } from './services/LanguageContext';
+import { ThemeProvider } from './services/ThemeContext';
 import { MotionConfig, LazyMotion, domAnimation } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import AIFloatingTutor from './components/AIFloatingTutor';
 import ProtectedRoute from './components/ProtectedRoute';
-import { ReactLenis } from 'lenis/react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 import { ensureAdminExists } from './services/adminSetup';
 
 // Lazy-loaded pages
@@ -57,17 +60,46 @@ const App: React.FC = () => {
     ensureAdminExists().catch(() => {});
   }, []);
 
+  // Motion & Lenis smooth scroll setup
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const lenis = new Lenis({
+      lerp: 0.1,
+      duration: 1.2,
+      smoothWheel: true,
+    });
+
+    lenis.on('scroll', ScrollTrigger.update);
+
+    const tickerCallback = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+    gsap.ticker.add(tickerCallback);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(tickerCallback);
+      lenis.destroy();
+    };
+  }, []);
+
   return (
-    <ReactLenis root options={{ lerp: 0.1, duration: 1.5, smoothWheel: true }}>
-      <LanguageProvider>
+    <ThemeProvider>
+    <LanguageProvider>
       <AuthProvider>
         <MotionConfig reducedMotion="user">
           <LazyMotion features={domAnimation}>
             <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-zinc-950 text-white">
-          <Navbar />
-          <main className="flex-1">
-            <React.Suspense fallback={<PageLoader />}>
+              <div className="min-h-screen flex flex-col bg-ink text-paper" style={{ background: 'var(--ink, #16140F)', color: 'var(--paper, #F1EBDD)' }}>
+                <Navbar />
+                <main className="flex-1">
+                  <React.Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* PUBLIC ROUTES */}
                 <Route path="/" element={<Navigate to="/home" replace />} />
@@ -85,10 +117,10 @@ const App: React.FC = () => {
                 <Route path="/tools/safety-guide" element={<SafetyGuide />} />
                 <Route path="/tools/bio-diagrams" element={<BioDiagrams />} />
 
-                {/* AUTH REQUIRED: any role */}
-                <Route path="/subjects" element={<ProtectedRoute><Subjects /></ProtectedRoute>} />
-                <Route path="/subjects/:subjectId" element={<ProtectedRoute><SubjectView /></ProtectedRoute>} />
-                <Route path="/subjects/:subjectId/:labId" element={<ProtectedRoute><LabView /></ProtectedRoute>} />
+                {/* PUBLIC: subjects & labs — no login required */}
+                <Route path="/subjects" element={<Subjects />} />
+                <Route path="/subjects/:subjectId" element={<SubjectView />} />
+                <Route path="/subjects/:subjectId/:labId" element={<LabView />} />
                 <Route path="/tutor" element={<ProtectedRoute><TutorPage /></ProtectedRoute>} />
                 <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -124,7 +156,7 @@ const App: React.FC = () => {
       </MotionConfig>
     </AuthProvider>
     </LanguageProvider>
-    </ReactLenis>
+    </ThemeProvider>
   );
 };
 

@@ -75,10 +75,19 @@ const SimulationStage: React.FC<SimulationStageProps> = ({ labId, hex }) => {
 
   if (!LabComponent) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-zinc-900/50 rounded-2xl p-12 text-center">
-        <FlaskConical size={64} className="text-zinc-700 mb-6" />
-        <h3 className="text-xl font-semibold text-white mb-2">Simulation Coming Soon</h3>
-        <p className="text-zinc-400 text-sm max-w-md">
+      <div
+        className="flex-1 flex flex-col items-center justify-center p-12 text-center"
+        style={{
+          background: '#F1EBDD',
+          backgroundImage: 'radial-gradient(circle, rgba(22,20,15,0.06) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+          border: '1px solid rgba(22,20,15,0.16)',
+          borderRadius: 4,
+        }}
+      >
+        <FlaskConical size={64} style={{ color: 'var(--verdigris, #2E7D6B)', marginBottom: 24 }} />
+        <h3 className="text-xl font-semibold mb-2" style={{ color: '#16140F', fontFamily: 'Fraunces, serif' }}>Simulation Coming Soon</h3>
+        <p className="text-sm max-w-md" style={{ color: 'rgba(22,20,15,0.7)', fontFamily: 'Hanken Grotesk, sans-serif' }}>
           The interactive simulation for this experiment is being developed. Meanwhile, refer to the Theory and Procedure tabs for a detailed understanding.
         </p>
       </div>
@@ -86,11 +95,20 @@ const SimulationStage: React.FC<SimulationStageProps> = ({ labId, hex }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-zinc-900/30 rounded-2xl overflow-hidden border border-white/5">
+    <div
+      className="flex-1 flex flex-col overflow-hidden"
+      style={{
+        background: '#F1EBDD',
+        backgroundImage: 'radial-gradient(circle, rgba(22,20,15,0.06) 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
+        border: '1px solid rgba(22,20,15,0.16)',
+        borderRadius: 4,
+      }}
+    >
       <React.Suspense
         fallback={
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin size-8 border-2 border-white/20 border-t-white rounded-full" />
+          <div className="flex-1 flex items-center justify-center p-12">
+            <div className="animate-spin size-8 border-2 rounded-full" style={{ borderColor: 'rgba(22,20,15,0.16)', borderTopColor: '#2E7D6B' }} />
           </div>
         }
       >

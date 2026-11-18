@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogIn, LogOut, User, Languages } from 'lucide-react';
-import { NAV_ITEMS } from '../constants';
+import { Menu, X, LogIn, LogOut, User, Sun, Moon } from 'lucide-react';
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { useAuth } from '../services/AuthContext';
 import { useLang, Lang } from '../services/LanguageContext';
-
-const LANG_OPTIONS: { code: Lang; label: string; fullLabel: string }[] = [
-  { code: 'en', label: 'English', fullLabel: 'English' },
-  { code: 'kn', label: 'ಕನ್ನಡ', fullLabel: 'ಕನ್ನಡ' },
-  { code: 'hi', label: 'हिंदी', fullLabel: 'हिंदी' },
-];
+import { useTheme } from '../services/ThemeContext';
+import EprayogLogo from './EprayogLogo';
 
 const MotionSpan = motion.span as any;
 
@@ -19,34 +14,44 @@ const TITLES = [
   { text: "ಇ-ಪ್ರಯೋಗ", lang: "kn" },
 ];
 
-// Auth-dependent nav items (shown only when logged in)
-const AUTH_NAV_ITEMS = [
-  { label: 'Experiments', path: '/subjects' },
-  { label: 'AI Tutor', path: '/tutor' },
-];
-
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [titleIndex, setTitleIndex] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profileData, role, signOut } = useAuth();
   const { lang, setLang, t } = useLang();
+  const { theme, toggleTheme } = useTheme();
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-  const navLinkClass = (path: string) => `relative text-sm font-medium transition-colors duration-300 ${
+  const navLinkClass = (path: string) => `relative text-sm tracking-wide transition-colors duration-200 ${
     isActive(path)
-      ? 'text-[#F1F5F9]'
-      : 'text-slate-400 hover:text-[#F1F5F9]'
+      ? 'text-paper font-medium underline underline-offset-8 decoration-sky decoration-2'
+      : 'text-chalk hover:text-paper font-normal'
   }`;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setTitleIndex((prev) => (prev + 1) % TITLES.length);
-    }, 3000);
+    }, 3500);
     return () => clearInterval(interval);
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -59,109 +64,42 @@ const Navbar: React.FC = () => {
     }
   };
 
-  // Display info: prefer name, fallback to full_name, then Firebase displayName
   const displayName = profileData?.name || profileData?.full_name || user?.displayName || user?.email?.split('@')[0] || '';
   const avatarUrl = profileData?.photoURL || user?.photoURL || '';
-  const avatarClass = profileData?.avatar && profileData.avatar.startsWith('bg-') ? profileData.avatar : 'bg-[#38BDF8]';
 
-  // Dashboard link: role-aware
   const dashboardPath = role === 'Admin' ? '/admin-dashboard' : role === 'Teacher' ? '/teacher-dashboard' : '/dashboard';
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 glass-nav h-20 px-6 md:px-12 flex items-center justify-between transition-colors duration-300 border-b border-[#1E293B]">
-      <Link to="/home" className="ep-logo-link flex items-center gap-3 group min-w-[180px]" style={{textDecoration:'none'}}>
-        {/* ── Animated Orbital Logo Mark ── */}
-        <svg
-          className="ep-nav-svg transition-transform duration-300 group-hover:scale-105"
-          viewBox="0 0 80 80"
-          width="44"
-          height="44"
-          xmlns="http://www.w3.org/2000/svg"
-          xmlnsXlink="http://www.w3.org/1999/xlink"
-          aria-hidden="true"
-          style={{overflow:'visible',flexShrink:0}}
-        >
-          <defs>
-            <linearGradient id="nav-outerG" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.9"/>
-              <stop offset="100%" stopColor="#0EA5E9" stopOpacity="0.9"/>
-            </linearGradient>
-            <linearGradient id="nav-innerG" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0EA5E9" stopOpacity="0.9"/>
-              <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.9"/>
-            </linearGradient>
-            <linearGradient id="nav-eG" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#F1F5F9"/>
-              <stop offset="100%" stopColor="#38BDF8"/>
-            </linearGradient>
-            <path id="nav-outerPath" d="M 67.2,40 A 27.2,11.2 0 1 1 67.19,39.97" fill="none"/>
-            <path id="nav-innerPath" d="M 57.6,40 A 17.6,7.2 0 1 1 57.59,39.97" fill="none"/>
-          </defs>
+    <nav
+      className={`fixed top-0 left-0 right-0 z-40 h-20 px-6 md:px-12 flex items-center justify-between transition-all duration-300 ${
+        isScrolled
+          ? 'bg-ink border-b border-rule-dark'
+          : 'bg-ink/90 md:bg-transparent md:backdrop-blur-sm border-b border-rule-dark/50'
+      }`}
+      style={{
+        backgroundColor: 'var(--ink, #070B14)',
+        borderBottom: '1px solid var(--rule-dark, rgba(56,189,248,0.16))',
+      }}
+    >
+      <Link to="/home" className="flex items-center gap-3.5 group min-w-[170px]" style={{ textDecoration: 'none' }}>
+        <div className="bg-ink p-1 rounded-sm">
+          <EprayogLogo size={38} idSuffix="nav" />
+        </div>
 
-          {/* Outer ring */}
-          <g className="ep-outer-ring" style={{transformOrigin:'40px 40px'}}>
-            <ellipse cx="40" cy="40" rx="27.2" ry="11.2"
-              fill="none" stroke="url(#nav-outerG)" strokeWidth="1.6" strokeOpacity="0.8"
-              transform="rotate(-20,40,40)"
-            />
-          </g>
-
-          {/* Inner ring */}
-          <g className="ep-inner-ring" style={{transformOrigin:'40px 40px'}}>
-            <ellipse cx="40" cy="40" rx="17.6" ry="7.2"
-              fill="none" stroke="url(#nav-innerG)" strokeWidth="1.6" strokeOpacity="0.8"
-              transform="rotate(55,40,40)"
-            />
-          </g>
-
-          {/* Outer electrons */}
-          <g className="ep-outer-ring" style={{transformOrigin:'40px 40px'}}>
-            <circle r="2.2" fill="#38BDF8">
-              <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear">
-                <mpath xlinkHref="#nav-outerPath"/>
-              </animateMotion>
-            </circle>
-            <circle r="2.2" fill="#38BDF8" begin="-3s">
-              <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" begin="-3s">
-                <mpath xlinkHref="#nav-outerPath"/>
-              </animateMotion>
-            </circle>
-          </g>
-
-          {/* Inner electron */}
-          <g className="ep-inner-ring" style={{transformOrigin:'40px 40px'}}>
-            <circle r="2" fill="#38BDF8">
-              <animateMotion dur="4s" repeatCount="indefinite" calcMode="linear">
-                <mpath xlinkHref="#nav-innerPath"/>
-              </animateMotion>
-            </circle>
-          </g>
-
-          {/* Central E */}
-          <g className="ep-eletter" style={{transformOrigin:'40px 40px'}}>
-            <text x="40" y="44" textAnchor="middle" dominantBaseline="middle"
-              fontFamily="'Inter', sans-serif" fontWeight="700" fontSize="20"
-              fill="url(#nav-eG)"
-              style={{userSelect:'none'}}
-            >E</text>
-          </g>
-        </svg>
-
-        {/* ── Wordmark ── */}
         <div className="flex flex-col justify-center">
           <AnimatePresence mode="wait">
             <MotionSpan
               key={titleIndex}
-              initial={{ y: 8, opacity: 0 }}
+              initial={{ y: 6, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -8, opacity: 0 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="text-lg md:text-xl font-display font-semibold text-[#F1F5F9] tracking-tight leading-none"
+              exit={{ y: -6, opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="text-lg md:text-xl font-display font-semibold text-paper tracking-tight leading-none"
             >
               {TITLES[titleIndex].lang === 'en' ? (
-                <>E-<span className="text-[#38BDF8]">Prayog</span></>
+                <>E-<span className="text-sky">Prayog</span></>
               ) : (
-                <>ಇ-<span className="text-[#38BDF8]">ಪ್ರಯೋಗ</span></>
+                <>ಇ-<span className="text-sky">ಪ್ರಯೋಗ</span></>
               )}
             </MotionSpan>
           </AnimatePresence>
@@ -171,45 +109,50 @@ const Navbar: React.FC = () => {
       {/* Desktop Nav */}
       <div className="hidden md:flex items-center gap-8">
         <Link to="/home" className={navLinkClass('/home')}>
-          {t.navHome}{isActive('/home') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+          {t.navHome}
         </Link>
         <Link to="/tools" className={navLinkClass('/tools')}>
-          {t.navTools}{isActive('/tools') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+          {t.navTools}
         </Link>
         <Link to="/about" className={navLinkClass('/about')}>
-          {t.navAbout}{isActive('/about') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+          {t.navAbout}
         </Link>
         {user && (
           <>
             <Link to="/subjects" className={navLinkClass('/subjects')}>
-              {t.navExperiments}{isActive('/subjects') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+              {t.navExperiments}
             </Link>
             <Link to="/tutor" className={navLinkClass('/tutor')}>
-              {t.navTutor}{isActive('/tutor') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+              {t.navTutor}
             </Link>
             <Link to={dashboardPath} className={navLinkClass(dashboardPath)}>
-              {t.navDashboard}{isActive(dashboardPath) && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#38BDF8] rounded-full" />}
+              {t.navDashboard}
             </Link>
           </>
         )}
 
-        {/* ── Language Switcher ── */}
-        <div className="flex items-center gap-1 bg-[#131B2E] rounded-full p-1 border border-[#1E293B]" title="Change Language">
-          <Languages size={14} className="text-slate-500 mx-2" />
-          {LANG_OPTIONS.map(opt => (
-            <button
-              key={opt.code}
-              onClick={() => setLang(opt.code)}
-              title={opt.fullLabel}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${
-                lang === opt.code
-                  ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30'
-                  : 'text-slate-400 hover:text-white border border-transparent'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* ── Language Switcher: EN / ಕನ್ನಡ / हिं ── */}
+        <div className="flex items-center gap-2 text-xs font-mono pl-3 border-l border-rule-dark" title="Change Language">
+          <button
+            onClick={() => setLang('en')}
+            className={`transition-colors py-1 ${lang === 'en' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk hover:text-paper'}`}
+          >
+            EN
+          </button>
+          <span className="text-chalk/40 select-none">/</span>
+          <button
+            onClick={() => setLang('kn')}
+            className={`transition-colors py-1 ${lang === 'kn' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk hover:text-paper'}`}
+          >
+            ಕನ್ನಡ
+          </button>
+          <span className="text-chalk/40 select-none">/</span>
+          <button
+            onClick={() => setLang('hi')}
+            className={`transition-colors py-1 ${lang === 'hi' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk hover:text-paper'}`}
+          >
+            हिं
+          </button>
         </div>
       </div>
 
@@ -217,19 +160,23 @@ const Navbar: React.FC = () => {
       <div className="hidden md:flex items-center">
         {user ? (
           <div className="flex items-center gap-3">
-            <Link to="/profile" aria-label="View Profile" className="group flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-[#131B2E] transition-all">
+            <Link to="/profile" aria-label="View Profile" className="group flex items-center gap-2.5 px-3 py-1.5 rounded-[2px] hover:bg-ink-2 border border-transparent hover:border-rule-dark transition-all">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="Profile" className="size-8 rounded-full object-cover border border-[#1E293B]" />
+                <img src={avatarUrl} alt="Profile" className="size-8 rounded-[2px] object-cover border border-rule-dark" />
               ) : (
-                <div className={`size-8 rounded-full ${avatarClass} flex items-center justify-center text-white text-xs font-bold border border-[#1E293B]`}>
+                <div className="size-8 rounded-[2px] bg-ink-2 flex items-center justify-center text-paper text-xs font-mono font-bold border border-rule-dark">
                   {displayName?.charAt(0)?.toUpperCase() || <User size={14} />}
                 </div>
               )}
-              <span className="text-sm text-slate-300 hidden lg:inline font-medium">
+              <span className="text-sm text-paper hidden lg:inline font-medium">
                 {displayName?.split(' ')[0] || t.navProfile}
               </span>
             </Link>
-            <button onClick={handleLogout} aria-label="Logout" className="p-2 rounded-full bg-[#131B2E] hover:bg-red-500/10 text-slate-400 hover:text-red-400 border border-[#1E293B] transition-all">
+            <button
+              onClick={handleLogout}
+              aria-label="Logout"
+              className="p-2 rounded-[2px] bg-ink-2 hover:bg-red-950/30 text-chalk hover:text-red-400 border border-rule-dark transition-colors"
+            >
               <LogOut size={16} />
             </button>
           </div>
@@ -243,63 +190,124 @@ const Navbar: React.FC = () => {
       </div>
 
       {/* Mobile hamburger */}
-      <button className="md:hidden p-2 -mr-2 text-slate-400 hover:text-white transition-colors" onClick={() => setIsOpen(!isOpen)} aria-label={isOpen ? "Close menu" : "Open menu"}>
-        {isOpen ? <X size={28} /> : <Menu size={28} />}
+      <button
+        className="md:hidden p-2 -mr-2 text-paper hover:text-sky transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label={isOpen ? "Close menu" : "Open menu"}
+      >
+        {isOpen ? <X size={26} /> : <Menu size={26} />}
       </button>
 
-      {/* Mobile menu */}
+      {/* Mobile menu: full-screen ink panel with large Fraunces nav links */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-20 left-0 w-full glass-nav flex flex-col p-6 gap-4 md:hidden border-b border-white/5 shadow-2xl"
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-x-0 top-20 bottom-0 bg-ink z-50 flex flex-col justify-between p-8 md:hidden overflow-y-auto"
+            style={{ background: 'var(--ink, #070B14)' }}
           >
-            {/* Mobile Language Switcher */}
-            <div className="flex items-center gap-2">
-              <Languages size={14} className="text-slate-500" />
-              <span className="text-xs text-slate-500 font-semibold">Language / ಭಾಷೆ / भाषा:</span>
-            </div>
-            <div className="flex gap-2">
-              {LANG_OPTIONS.map(opt => (
+            <div className="flex flex-col gap-6">
+              {/* Language Switcher */}
+              <div className="flex items-center gap-3 text-sm font-mono pb-4 border-b border-rule-dark">
+                <span className="text-chalk text-xs uppercase tracking-wider">Language:</span>
                 <button
-                  key={opt.code}
-                  onClick={() => setLang(opt.code)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                    lang === opt.code
-                      ? 'bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20'
-                      : 'bg-[#1A202C]/50 text-slate-400 hover:text-white border border-white/5'
-                  }`}
+                  onClick={() => setLang('en')}
+                  className={`py-1 ${lang === 'en' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk'}`}
                 >
-                  {opt.fullLabel}
+                  EN
                 </button>
-              ))}
+                <span className="text-chalk/40">/</span>
+                <button
+                  onClick={() => setLang('kn')}
+                  className={`py-1 ${lang === 'kn' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk'}`}
+                >
+                  ಕನ್ನಡ
+                </button>
+                <span className="text-chalk/40">/</span>
+                <button
+                  onClick={() => setLang('hi')}
+                  className={`py-1 ${lang === 'hi' ? 'text-paper underline underline-offset-4 font-semibold' : 'text-chalk'}`}
+                >
+                  हिं
+                </button>
+              </div>
+
+              {/* Fraunces Nav Links */}
+              <div className="flex flex-col gap-5 pt-2">
+                <Link
+                  to="/home"
+                  onClick={() => setIsOpen(false)}
+                  className={`font-display text-3xl font-medium tracking-tight ${isActive('/home') ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                >
+                  {t.navHome}
+                </Link>
+                <Link
+                  to="/tools"
+                  onClick={() => setIsOpen(false)}
+                  className={`font-display text-3xl font-medium tracking-tight ${isActive('/tools') ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                >
+                  {t.navTools}
+                </Link>
+                <Link
+                  to="/about"
+                  onClick={() => setIsOpen(false)}
+                  className={`font-display text-3xl font-medium tracking-tight ${isActive('/about') ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                >
+                  {t.navAbout}
+                </Link>
+                {user && (
+                  <>
+                    <Link
+                      to="/subjects"
+                      onClick={() => setIsOpen(false)}
+                      className={`font-display text-3xl font-medium tracking-tight ${isActive('/subjects') ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                    >
+                      {t.navExperiments}
+                    </Link>
+                    <Link
+                      to="/tutor"
+                      onClick={() => setIsOpen(false)}
+                      className={`font-display text-3xl font-medium tracking-tight ${isActive('/tutor') ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                    >
+                      {t.navTutor}
+                    </Link>
+                    <Link
+                      to={dashboardPath}
+                      onClick={() => setIsOpen(false)}
+                      className={`font-display text-3xl font-medium tracking-tight ${isActive(dashboardPath) ? 'text-paper underline underline-offset-8 decoration-sky' : 'text-chalk hover:text-paper'}`}
+                    >
+                      {t.navDashboard}
+                    </Link>
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="font-display text-3xl font-medium tracking-tight text-sky"
+                    >
+                      {t.navProfile}
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
-            <hr className="border-[#1E293B]" />
-            <Link to="/home" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive('/home') ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navHome}</Link>
-            <Link to="/tools" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive('/tools') ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navTools}</Link>
-            <Link to="/about" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive('/about') ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navAbout}</Link>
-            {user && (
-              <>
-                <hr className="border-[#1E293B]" />
-                <Link to="/subjects" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive('/subjects') ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navExperiments}</Link>
-                <Link to="/tutor" onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive('/tutor') ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navTutor}</Link>
-                <Link to={dashboardPath} onClick={() => setIsOpen(false)} className={`text-lg font-medium transition-colors ${isActive(dashboardPath) ? 'text-[#38BDF8]' : 'text-slate-300 hover:text-white'}`}>{t.navDashboard}</Link>
-                <Link to="/profile" onClick={() => setIsOpen(false)} className="text-lg font-medium text-[#38BDF8]">{t.navProfile}</Link>
-              </>
-            )}
-            <hr className="border-[#1E293B] mt-2" />
-            {user ? (
-              <button onClick={handleLogout} className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-red-500/10 text-red-400 font-medium hover:bg-red-500/20 transition-colors border border-red-500/20">
-                <LogOut size={18} /> {t.navLogout}
-              </button>
-            ) : (
-              <Link to="/login" onClick={() => setIsOpen(false)} className="btn-primary w-full justify-center text-center py-3">
-                <LogIn size={18} /> {t.navLogin}
-              </Link>
-            )}
+
+            {/* Bottom logout / login button */}
+            <div className="pt-6 border-t border-rule-dark mt-auto">
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-[2px] bg-ink-2 text-paper hover:text-red-400 border border-rule-dark transition-colors font-medium text-base"
+                >
+                  <LogOut size={18} /> {t.navLogout}
+                </button>
+              ) : (
+                <Link to="/login" onClick={() => setIsOpen(false)} className="btn-primary w-full justify-center text-center py-3.5 text-base">
+                  <LogIn size={18} /> {t.navLogin}
+                </Link>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

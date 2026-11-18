@@ -1,10 +1,10 @@
+@import "./tokens.css";
 @import "tailwindcss";
 @config "./tailwind.config.js";
 
 /* ══════════════════════════════════════════════
-   E-Prayog — index.css
-   Obsidian Lab Design System v3.0
-   Base layer: resets, fonts, scroll reveal init
+   E-Prayog — Clean Science Lab Design System
+   Palette: Midnight Space & Soft Sky Blue (#87CEEB)
    ══════════════════════════════════════════════ */
 
 html,
@@ -12,27 +12,133 @@ body,
 #root {
   margin: 0;
   padding: 0;
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
-  font-family: var(--font-body, 'Plus Jakarta Sans', system-ui, sans-serif);
-  background: #0B1120 !important;
-  color: var(--text-primary, #F1F5F9);
+  font-family: var(--font-body, 'Hanken Grotesk', system-ui, sans-serif);
+  background: var(--ink, #070B14) !important;
+  color: var(--paper, #F0F6FC);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#root,
-#root > div {
-  background-color: transparent !important;
-  background-image: none !important;
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display, 'Fraunces', Georgia, serif);
+  font-optical-sizing: auto;
 }
 
+code,
+pre,
+.font-mono,
+.reading-value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+::selection {
+  background-color: var(--sky, #87CEEB);
+  color: #070B14;
+}
+
+/* Base surface panel */
+.glass-panel {
+  background: var(--ink-2, #0E1626);
+  border: 1px solid var(--rule-dark, rgba(135, 206, 235, 0.16));
+  border-radius: 6px;
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s var(--ease-out-expo);
+}
+
+.glass-panel:hover {
+  border-color: rgba(135, 206, 235, 0.32);
+}
+
+/* Navbar */
+.glass-nav {
+  background: rgba(7, 11, 20, 0.90);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule-dark, rgba(135, 206, 235, 0.16));
+  transition: background 300ms ease, border-color 300ms ease;
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--sky, #87CEEB);
+  color: #070B14 !important;
+  font-family: var(--font-body, 'Hanken Grotesk', system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: none !important;
+  transition: background-color 0.2s var(--ease-out-expo), transform 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: #5DADE2;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(135, 206, 235, 0.08);
+  color: var(--paper, #F0F6FC);
+  border: 1px solid rgba(135, 206, 235, 0.28);
+  font-family: var(--font-body, 'Hanken Grotesk', system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 500;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s var(--ease-out-expo);
+}
+
+.btn-secondary:hover {
+  background: rgba(135, 206, 235, 0.15);
+  border-color: rgba(135, 206, 235, 0.45);
+  color: #87CEEB;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ink, #070B14);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(135, 206, 235, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sky, #87CEEB);
+}
 
 /* ── Accessible reduced-motion: collapse all animations ── */
 @media (prefers-reduced-motion: reduce) {
-  * {
+
+  *,
+  ::before,
+  ::after {
     animation-delay: -1ms !important;
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;

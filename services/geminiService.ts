@@ -1,6 +1,7 @@
 import { auth } from './firebase';
 import { getClientEnv } from './env';
 
+// TODO SECURITY: This key must be moved to a server-side proxy (Firebase Function or Netlify Function). Do NOT use VITE_GEMINI_API_KEY in production — it is exposed in the browser bundle.
 export interface ChatSession {
   history: { role: string; text: string }[];
   contextString: string | null;
