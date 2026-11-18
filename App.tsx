@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import AIFloatingTutor from './components/AIFloatingTutor';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ReactLenis } from 'lenis/react';
+import { ensureAdminExists } from './services/adminSetup';
 
 // Lazy-loaded pages
 const Home = lazy(() => import('./pages/Home'));

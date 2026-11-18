@@ -427,7 +427,7 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-zinc-400">{req.teacherId}: {req.failedAttempts} failed attempts</p>
                   <p className="text-xs text-zinc-500">{req.requestedAt ? new Date(req.requestedAt).toLocaleString() : ''}</p>
                 </div>
-                <button onClick={() => { setResetTarget(req); setShowResetModal(true); setNewPassword(''); }}
+                <button onClick={() => { setResetTarget(req); setShowResetModal(true); }}
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-sm font-bold transition-colors">Reset Password</button>
               </div>
             </GlassCard>

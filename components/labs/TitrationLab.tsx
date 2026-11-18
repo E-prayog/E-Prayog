@@ -345,7 +345,7 @@ export const TitrationLab: React.FC = () => {
       ctx.stroke();
 
       // 5. Droplet Animation & Fluid Fall into Flask
-      if (flowRate !== 'off' || (t % 1 < 0.2 && flowRate === 'slow')) {
+      if (flowRate === 'fast' || (flowRate === 'slow' && t % 1 < 0.2)) {
         const dropY = tipBottomY + ((t * 60) % 35);
         ctx.fillStyle = '#38BDF8';
         ctx.beginPath();

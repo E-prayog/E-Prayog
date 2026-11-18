@@ -119,8 +119,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const newProfile: any = {
           uid,
-          name: authUser.displayName || (isAdmin ? 'Admin' : (isTeacher ? 'Teacher' : 'Student')),
-          full_name: authUser.displayName || (isAdmin ? 'Admin' : (isTeacher ? 'Teacher' : 'Student')),
+          name: authUser.displayName || 'Student',
+          full_name: authUser.displayName || 'Student',
           email: email,
           role: role,
           photoURL: authUser.photoURL || '',
