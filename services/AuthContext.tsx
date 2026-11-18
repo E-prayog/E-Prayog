@@ -84,22 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfileData(data);
     if (data?.role) {
       setRole(data.role);
-      // Save to localStorage for quick load on next session
       if (auth.currentUser) {
-        localStorage.setItem(`ep_profile_${auth.currentUser.uid}`, JSON.stringify(data));
+        const safeCache = { ...data, role: data.role };
+        localStorage.setItem(`ep_profile_${auth.currentUser.uid}`, JSON.stringify(safeCache));
       }
-    } else if (auth.currentUser) {
-      // Guess role from email if profile doc is missing or role field is empty
-      const email = auth.currentUser.email || '';
-      const isTeacher = email.includes('@tchr.e-prayog') || 
-                        email.includes('-tchr-e-prayog@eprayog-auth.com') || 
-                        email === 'teacher@eprayog.com';
-      const isAdmin = email.includes('@admin.e-prayog') || 
-                      email.includes('-admin-e-prayog@eprayog-auth.com') || 
-                      email === 'admin@eprayog.com';
-      setRole(isAdmin ? 'Admin' : (isTeacher ? 'Teacher' : 'Student'));
     } else {
-      setRole('Student');
+      setRole('');
     }
   };
 
@@ -125,13 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!authUser) return null;
 
         const email = authUser.email || '';
-        const isTeacher = email.includes('@tchr.e-prayog') || 
-                          email.includes('-tchr-e-prayog@eprayog-auth.com') || 
-                          email === 'teacher@eprayog.com';
-        const isAdmin = email.includes('@admin.e-prayog') || 
-                        email.includes('-admin-e-prayog@eprayog-auth.com') || 
-                        email === 'admin@eprayog.com';
-        const role = isAdmin ? 'Admin' : (isTeacher ? 'Teacher' : 'Student');
+        const role = 'Student';
 
         const newProfile: any = {
           uid,
@@ -219,8 +203,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const cached = localStorage.getItem(`ep_profile_${firebaseUser.uid}`);
           if (cached) {
             const data = JSON.parse(cached);
-            applyProfile(data);
-            setLoading(false); // Stop main loader early
+            if (data && data.id === firebaseUser.uid) {
+              applyProfile({ ...data, role: '' });
+            }
           }
         } catch (e) {}
 

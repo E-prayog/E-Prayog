@@ -17,6 +17,8 @@ import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
 import { quizData } from '../data/quizData';
 import { subscribeToLabQuiz, getDefaultQuizQuestions } from '../services/quizService';
+import { experimentVideos } from '../data/experimentVideos';
+import { escapeHtml } from '../services/validation';
 
 
 const MotionDiv = motion.div as any;
@@ -104,8 +106,10 @@ const LabView: React.FC = () => {
     if (!printRef.current) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    const safeTitle = escapeHtml(lab.title);
+    const safeSubject = escapeHtml(subject.name);
     printWindow.document.write(`
-      <html><head><title>${lab.title} - Observation | E-Prayog</title>
+      <html><head><title>${safeTitle} - Observation | E-Prayog</title>
       <style>
         body { font-family: 'Inter', Arial, sans-serif; padding: 40px; color: #0f172a; }
         h1 { font-size: 22px; margin-bottom: 4px; }
@@ -389,29 +393,45 @@ const LabView: React.FC = () => {
                 <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   <Youtube size={18} className="text-red-500" /> {t.labVideoDemo}
                 </h3>
-                {content.videoId ? (
-                  <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${content.videoId}`}
-                      title={`${lab.title} - Video Demo`}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3">
-                    <Youtube size={48} className="text-zinc-700" />
-                    <p className="text-sm text-zinc-500">{t.labVideoComingSoon}</p>
-                    <a
-                      href={`https://www.youtube.com/results?search_query=Karnataka+PUC+${encodeURIComponent(lab.title)}+experiment`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
-                    >
-                      {t.labSearchYouTube} <ArrowRight size={12} />
-                    </a>
-                  </div>
-                )}
+                {(() => {
+                  // Resolve video: prefer experimentVideos map, fall back to content.videoId
+                  const videoEntry = labId ? experimentVideos[labId] : undefined;
+                  let resolvedVideoId: string | undefined = content.videoId;
+                  let resolvedTitle: string = `${lab.title} - Video Demo`;
+                  if (videoEntry) {
+                    if ('videoId' in videoEntry) {
+                      resolvedVideoId = videoEntry.videoId;
+                      resolvedTitle = videoEntry.title;
+                    } else {
+                      const langEntry = (videoEntry as any)[t.lang as string] || (videoEntry as any).en;
+                      if (langEntry) { resolvedVideoId = langEntry.videoId; resolvedTitle = langEntry.title; }
+                    }
+                  }
+                  return resolvedVideoId ? (
+                    <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${resolvedVideoId}`}
+                        title={resolvedTitle}
+                        className="w-full h-full"
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3">
+                      <Youtube size={48} className="text-zinc-700" />
+                      <p className="text-sm text-zinc-500">{t.labVideoComingSoon}</p>
+                      <a
+                        href={`https://www.youtube.com/results?search_query=Karnataka+PUC+${encodeURIComponent(lab.title)}+experiment`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+                      >
+                        {t.labSearchYouTube} <ArrowRight size={12} />
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

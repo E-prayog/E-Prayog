@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { SUBJECTS } from '../constants';
 import GlassCard from '../components/GlassCard';
-import { ArrowRight, Clock, Filter } from 'lucide-react';
+import { ArrowRight, Clock, Filter, PlayCircle } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
+import { experimentVideos } from '../data/experimentVideos';
 
 const MotionDiv = motion.div as any;
 
@@ -133,6 +134,11 @@ const SubjectView: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-1 text-xs text-zinc-500">
                     <Clock size={12} /> {lab.duration}
+                    {experimentVideos[lab.id] && (
+                      <span title="Video available" className="ml-1 text-red-400">
+                        <PlayCircle size={12} strokeWidth={1.5} />
+                      </span>
+                    )}
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{lab.title}</h3>

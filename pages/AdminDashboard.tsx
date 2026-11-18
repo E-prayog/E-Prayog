@@ -47,7 +47,6 @@ const AdminDashboard: React.FC = () => {
   // Reset password modal
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<any>(null);
-  const [newPassword, setNewPassword] = useState('');
   const [resetting, setResetting] = useState(false);
 
   // Subscriptions
@@ -127,12 +126,11 @@ const AdminDashboard: React.FC = () => {
 
   // ── Handle Reset ────────────────────────
   const handleResetPassword = async () => {
-    if (!resetTarget || !newPassword) return;
+    if (!resetTarget) return;
     setResetting(true);
     try {
-      await resolveResetRequest(resetTarget.id, resetTarget.teacherUid, newPassword);
+      await resolveResetRequest(resetTarget.id);
       setShowResetModal(false);
-      setNewPassword('');
       setResetTarget(null);
     } catch (e) {
       alert('Failed to resolve reset request');
@@ -516,15 +514,13 @@ const AdminDashboard: React.FC = () => {
       {showResetModal && resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white mb-4">Reset Password for {resetTarget.teacherName || resetTarget.teacherId}</h2>
-            <p className="text-sm text-zinc-400 mb-4">Enter a new password. The teacher's next login will use this password.</p>
-            <input type="text" placeholder="New password (min 6 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={6}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-amber-500/50 mb-4" />
+            <h2 className="text-lg font-semibold text-white mb-4">Reset request for {resetTarget.teacherName || resetTarget.teacherId}</h2>
+            <p className="text-sm text-zinc-400 mb-4">Mark this request resolved. Set a new password in Firebase Console → Authentication. Do not store passwords in Firestore.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowResetModal(false)} className="flex-1 py-3 rounded-xl text-zinc-400 font-bold hover:bg-white/5 transition-colors">Cancel</button>
-              <button onClick={handleResetPassword} disabled={resetting || newPassword.length < 6}
+              <button onClick={handleResetPassword} disabled={resetting}
                 className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {resetting ? <Loader2 className="animate-spin" size={18} /> : <Key size={18} />} Reset
+                {resetting ? <Loader2 className="animate-spin" size={18} /> : <Key size={18} />} Mark resolved
               </button>
             </div>
           </div>

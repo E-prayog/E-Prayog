@@ -18,9 +18,9 @@ const StaffLogin: React.FC = () => {
   useEffect(() => {
     // Pre-fill placeholder emails for convenience (no passwords auto-filled)
     if (type === 'admin') {
-      setEmail('admin@eprayog.com');
+      setEmail('');
     } else if (type === 'teacher') {
-      setEmail('teacher@eprayog.com');
+      setEmail('');
     }
   }, [type]);
 

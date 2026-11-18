@@ -1,8 +1,0 @@
-﻿components/labs/TitrationLab.tsx(35,19): error TS2448: Block-scoped variable 'fy' used before its declaration.
-components/Navbar.tsx(49,92): error TS2339: Property 'user_metadata' does not exist on type 'User'.
-components/Navbar.tsx(49,126): error TS2339: Property 'user_metadata' does not exist on type 'User'.
-components/Navbar.tsx(51,111): error TS2339: Property 'user_metadata' does not exist on type 'User'.
-components/Navbar.tsx(51,146): error TS2339: Property 'user_metadata' does not exist on type 'User'.
-pages/AdminDashboard.tsx(410,61): error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Object literal may only specify known properties, and 'size' does not exist in type 'Partial<unknown> & Attributes'.

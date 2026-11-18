@@ -20,6 +20,31 @@ import { useLang } from '../services/LanguageContext';
 
 const MotionDiv = motion.div as any;
 
+const LOGIN_FAIL_KEY = 'ep_login_failures';
+
+function loginBackoffMs(): number {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LOGIN_FAIL_KEY) || '{"n":0,"t":0}');
+    const n = Number(raw.n) || 0;
+    if (n < 5) return 0;
+    const wait = Math.min(300_000, 30_000 * (2 ** (n - 5)));
+    return Math.max(0, wait - (Date.now() - Number(raw.t || 0)));
+  } catch {
+    return 0;
+  }
+}
+
+function recordLoginFailure() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LOGIN_FAIL_KEY) || '{"n":0,"t":0}');
+    localStorage.setItem(LOGIN_FAIL_KEY, JSON.stringify({ n: (Number(raw.n) || 0) + 1, t: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+function clearLoginFailures() {
+  localStorage.removeItem(LOGIN_FAIL_KEY);
+}
+
 function friendlyError(err: any): string {
   const msg = err?.message || err?.code || '';
   if (msg.includes('unauthorized-domain')) return 'This domain is not authorised by Firebase. Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.';

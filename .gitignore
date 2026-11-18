@@ -9,11 +9,19 @@ node_modules/
 # Environment Variables
 # ===========================
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env.*.local
+*.pem
+*.p12
+*.key
+*serviceAccount*.json
+*credentials*.json
+google-services.json
+GoogleService-Info.plist
 
 # ===========================
 # Build Outputs

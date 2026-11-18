@@ -7,7 +7,6 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import AIFloatingTutor from './components/AIFloatingTutor';
 import ProtectedRoute from './components/ProtectedRoute';
-import { ensureAdminExists } from './services/adminSetup';
 import { ReactLenis } from 'lenis/react';
 
 // Lazy-loaded pages

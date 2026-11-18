@@ -29,8 +29,14 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div style={{ padding: '20px', color: 'red', zIndex: 9999, position: 'relative' }}>
           <h1>Something went wrong.</h1>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.toString()}</pre>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.stack}</pre>
+          {import.meta.env.DEV ? (
+            <>
+              <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.toString()}</pre>
+              <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.stack}</pre>
+            </>
+          ) : (
+            <p>Please refresh the page. If this continues, contact your teacher.</p>
+          )}
         </div>
       );
     }
