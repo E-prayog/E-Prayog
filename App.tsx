@@ -1,5 +1,5 @@
 import React, { lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './services/AuthContext';
 import { LanguageProvider } from './services/LanguageContext';
 import { ThemeProvider } from './services/ThemeContext';
@@ -12,6 +12,22 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { ensureAdminExists } from './services/adminSetup';
+
+// Enforce scroll to top on every route change and initial mount
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if ((window as any).__lenis) {
+      (window as any).__lenis.scrollTo(0, { immediate: true });
+    }
+  }, [pathname]);
+
+  return null;
+};
 
 // Lazy-loaded pages
 const Home = lazy(() => import('./pages/Home'));
@@ -55,8 +71,14 @@ const PageLoader = () => (
 );
 
 const App: React.FC = () => {
-  // Initialize admin account on first load (idempotent)
+  // Initialize admin account on first load + disable browser auto scroll restoration
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     ensureAdminExists().catch(() => {});
   }, []);
 
@@ -75,6 +97,9 @@ const App: React.FC = () => {
       smoothWheel: true,
     });
 
+    lenis.scrollTo(0, { immediate: true });
+    (window as any).__lenis = lenis;
+
     lenis.on('scroll', ScrollTrigger.update);
 
     const tickerCallback = (time: number) => {
@@ -85,6 +110,7 @@ const App: React.FC = () => {
 
     return () => {
       gsap.ticker.remove(tickerCallback);
+      delete (window as any).__lenis;
       lenis.destroy();
     };
   }, []);
@@ -96,6 +122,7 @@ const App: React.FC = () => {
         <MotionConfig reducedMotion="user">
           <LazyMotion features={domAnimation}>
             <BrowserRouter>
+              <ScrollToTop />
               <div className="min-h-screen flex flex-col bg-ink text-paper" style={{ background: 'var(--ink, #16140F)', color: 'var(--paper, #F1EBDD)' }}>
                 <Navbar />
                 <main className="flex-1">

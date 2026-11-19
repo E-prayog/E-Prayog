@@ -10,13 +10,15 @@ import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firesto
 import { createUserWithEmailAndPassword, getAuth as getFirebaseAuth, signOut as fbSignOut } from 'firebase/auth';
 import GlassCard from '../components/GlassCard';
 import AdminQuizDesigner from '../components/admin/AdminQuizDesigner';
-import { ShieldCheck, Users, BookOpen, MessageSquare, Key, Activity, Search, Loader2, X, CheckCircle2, Trash2, UserPlus, BarChart3, Star, Flame, Brain } from 'lucide-react';
+import AdminVideoManager from '../components/admin/AdminVideoManager';
+import { ShieldCheck, Users, BookOpen, MessageSquare, Key, Activity, Search, Loader2, X, CheckCircle2, Trash2, UserPlus, BarChart3, Star, Flame, Brain, Youtube } from 'lucide-react';
 
-type Tab = 'overview' | 'quizzes' | 'teachers' | 'students' | 'feedback' | 'resets' | 'activity';
+type Tab = 'overview' | 'quizzes' | 'videos' | 'teachers' | 'students' | 'feedback' | 'resets' | 'activity';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview', icon: <BarChart3 size={15} /> },
   { id: 'quizzes', label: 'Quiz Designer', icon: <Brain size={15} /> },
+  { id: 'videos', label: 'Experiment Videos', icon: <Youtube size={15} /> },
   { id: 'teachers', label: 'Teachers', icon: <BookOpen size={15} /> },
   { id: 'students', label: 'Students', icon: <Users size={15} /> },
   { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={15} /> },
@@ -250,6 +252,9 @@ const AdminDashboard: React.FC = () => {
 
       {/* ── Quizzes / Quiz Designer Tab ── */}
       {tab === 'quizzes' && <AdminQuizDesigner />}
+
+      {/* ── Experiment Videos Tab ── */}
+      {tab === 'videos' && <AdminVideoManager />}
 
       {/* ── Teachers Tab ── */}
       {tab === 'teachers' && (

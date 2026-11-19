@@ -56,6 +56,16 @@ const Home: React.FC = () => {
   const [hoveredSubject, setHoveredSubject] = useState<number | null>(null);
   const [expandedMobileSubject, setExpandedMobileSubject] = useState<string | null>(null);
 
+  // Guarantee Home opens at the absolute top (y=0) on mount
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if ((window as any).__lenis) {
+      (window as any).__lenis.scrollTo(0, { immediate: true });
+    }
+  }, []);
+
   const stats = [
     { label: t.statsExperiments, value: 42 },
     { label: t.statsSubjects, value: 5 },

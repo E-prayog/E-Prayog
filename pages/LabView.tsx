@@ -11,7 +11,7 @@ import { trackLabVisit, trackTabCompleted, trackQuizScore } from '../services/la
 import {
   ArrowLeft, ArrowRight, Target, BookOpen, ListChecks, Info, Youtube,
   FlaskConical, ClipboardList, CheckCircle2, Globe, HelpCircle, Brain,
-  Printer, ChevronLeft, ChevronRight,
+  Printer, ChevronLeft, ChevronRight, Edit3, Plus,
 } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
@@ -19,6 +19,8 @@ import { quizData } from '../data/quizData';
 import { subscribeToLabQuiz, getDefaultQuizQuestions } from '../services/quizService';
 import { experimentVideos } from '../data/experimentVideos';
 import { escapeHtml } from '../services/validation';
+import { subscribeToCustomVideos } from '../services/videoService';
+import AdminVideoModal from '../components/admin/AdminVideoModal';
 
 
 const MotionDiv = motion.div as any;
@@ -55,7 +57,15 @@ const LabView: React.FC = () => {
   const [shuffledViva, setShuffledViva] = useState<any[]>([]);
 
   const printRef = useRef<HTMLDivElement>(null);
-  const { user, profileData } = useAuth();
+  const { user, role, profileData } = useAuth();
+  const isAdmin = role === 'Admin' || profileData?.role === 'Admin';
+  const [customVideos, setCustomVideos] = useState<Record<string, { videoId: string; title: string }>>({});
+  const [showAdminVideoModal, setShowAdminVideoModal] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeToCustomVideos(setCustomVideos);
+    return () => unsub();
+  }, []);
 
   const subject = SUBJECTS.find(s => s.id === subjectId);
   const lab = subject?.labs.find(l => l.id === labId);
@@ -392,23 +402,42 @@ const LabView: React.FC = () => {
 
               {/* YouTube Video */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <Youtube size={18} className="text-red-500" /> {t.labVideoDemo}
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Youtube size={18} className="text-red-500" /> {t.labVideoDemo}
+                  </h3>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setShowAdminVideoModal(true)}
+                      className="px-2.5 py-1 rounded-md bg-[#87CEEB]/15 hover:bg-[#87CEEB]/25 border border-[#87CEEB]/30 text-[#87CEEB] text-xs font-medium flex items-center gap-1.5 transition-colors"
+                      title="Admin: Edit experiment video"
+                    >
+                      <Edit3 size={13} />
+                      <span>Edit Video (Admin)</span>
+                    </button>
+                  )}
+                </div>
+
                 {(() => {
-                  // Resolve video: prefer experimentVideos map, fall back to content.videoId
-                  const videoEntry = labId ? experimentVideos[labId] : undefined;
-                  let resolvedVideoId: string | undefined = content.videoId;
-                  let resolvedTitle: string = `${lab.title} - Video Demo`;
-                  if (videoEntry) {
-                    if ('videoId' in videoEntry) {
-                      resolvedVideoId = videoEntry.videoId;
-                      resolvedTitle = videoEntry.title;
+                  // Resolve video: prefer customVideos, then experimentVideos map, then content.videoId
+                  const custom = labId ? customVideos[labId] : undefined;
+                  const staticEntry = labId ? experimentVideos[labId] : undefined;
+                  let resolvedVideoId: string | undefined = custom?.videoId || content.videoId;
+                  let resolvedTitle: string = custom?.title || `${lab.title} - Video Demo`;
+
+                  if (!resolvedVideoId && staticEntry) {
+                    if ('videoId' in staticEntry) {
+                      resolvedVideoId = staticEntry.videoId;
+                      resolvedTitle = staticEntry.title;
                     } else {
-                      const langEntry = (videoEntry as any)[t.lang as string] || (videoEntry as any).en;
-                      if (langEntry) { resolvedVideoId = langEntry.videoId; resolvedTitle = langEntry.title; }
+                      const langEntry = (staticEntry as any)[t.lang as string] || (staticEntry as any).en;
+                      if (langEntry) {
+                        resolvedVideoId = langEntry.videoId;
+                        resolvedTitle = langEntry.title;
+                      }
                     }
                   }
+
                   return resolvedVideoId ? (
                     <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
                       <iframe
@@ -421,19 +450,38 @@ const LabView: React.FC = () => {
                       />
                     </div>
                   ) : (
-                    <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3">
+                    <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3 p-6 text-center">
                       <Youtube size={48} className="text-zinc-700" />
-                      <p className="text-sm text-zinc-500">{t.labVideoComingSoon}</p>
-                      <a
-                        href={`https://www.youtube.com/results?search_query=Karnataka+PUC+${encodeURIComponent(lab.title)}+experiment`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
-                      >
-                        {t.labSearchYouTube} <ArrowRight size={12} />
-                      </a>
+                      <p className="text-sm text-zinc-400">{t.labVideoComingSoon}</p>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setShowAdminVideoModal(true)}
+                          className="mt-2 px-3.5 py-1.5 rounded-lg bg-[#87CEEB] text-[#070D18] hover:bg-[#5DADE2] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                          <Plus size={14} />
+                          <span>Add Video as Admin</span>
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
+
+                {/* Admin Video Modal */}
+                {isAdmin && lab && (
+                  <AdminVideoModal
+                    isOpen={showAdminVideoModal}
+                    onClose={() => setShowAdminVideoModal(false)}
+                    labId={lab.id}
+                    labTitle={lab.title}
+                    initialVideoId={
+                      customVideos[lab.id]?.videoId ||
+                      (experimentVideos[lab.id] && 'videoId' in experimentVideos[lab.id]
+                        ? (experimentVideos[lab.id] as any).videoId
+                        : '')
+                    }
+                    initialTitle={customVideos[lab.id]?.title}
+                  />
+                )}
               </div>
             </div>
           )}

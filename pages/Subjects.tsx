@@ -5,6 +5,7 @@ import GlassCard from '../components/GlassCard';
 import { SUBJECTS } from '../constants';
 import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
+import { SUBJECT_REALISTIC_IMAGES } from '../data/labImages';
 
 const MotionDiv = motion.div as any;
 const icons = [Zap, FlaskConical, Dna, Calculator, Monitor];
@@ -46,30 +47,60 @@ const Subjects: React.FC = () => {
             const Icon = icons[idx] || Zap;
             const translatedName = subjectNameMap[subject.id] || subject.name;
             const translatedDesc = subjectDescMap[subject.id] || subject.description;
+            const imgMeta = SUBJECT_REALISTIC_IMAGES[subject.id];
+
             return (
               <Link key={subject.id} to={`/subjects/${subject.id}`} className="group">
-                <GlassCard color={subject.color} className="h-full flex flex-col justify-between">
+                <GlassCard color={subject.color} className="h-full flex flex-col justify-between overflow-hidden">
                   <div>
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="size-11 rounded-[2px] bg-ink border border-rule-dark flex items-center justify-center text-verdigris">
-                        <Icon size={20} />
+                    {/* Realistic Laboratory Photo Banner */}
+                    <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden bg-[#070D18] border border-sky-500/15 mb-4 group/thumb">
+                      <img
+                        src={imgMeta?.url}
+                        alt={imgMeta?.alt || translatedName}
+                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#070D18] via-[#070D18]/30 to-black/20" />
+
+                      {/* Subject Icon Badge */}
+                      <div className="absolute top-2.5 left-2.5 size-9 rounded-md bg-[#070D18]/90 backdrop-blur-md border border-sky-500/20 flex items-center justify-center text-sky shadow-md">
+                        <Icon size={18} />
                       </div>
-                      <div>
-                        <h2 className="text-lg font-display font-normal text-paper group-hover:text-verdigris transition-colors">{translatedName}</h2>
-                        <span className="text-xs font-mono text-chalk">
-                          {subject.labs.length} {t.subjectsExperiments}
-                        </span>
+
+                      {/* Experiments Count Badge */}
+                      <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-mono tracking-wider uppercase bg-[#070D18]/90 backdrop-blur-md border border-sky-500/20 text-sky-200">
+                        {subject.labs.length} {t.subjectsExperiments}
                       </div>
+
+                      {/* Apparatus / Domain caption */}
+                      {imgMeta?.caption && (
+                        <div className="absolute bottom-2 left-2.5 right-2.5">
+                          <span className="text-[10px] font-mono text-slate-300 drop-shadow truncate block">
+                            {imgMeta.caption}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-chalk mb-5 leading-relaxed">{translatedDesc}</p>
-                    <div className="flex flex-wrap gap-1.5 mb-6">
+
+                    <h2 className="text-xl font-display font-medium text-paper group-hover:text-sky transition-colors mb-2">
+                      {translatedName}
+                    </h2>
+                    <p className="text-xs text-chalk mb-4 leading-relaxed line-clamp-2">{translatedDesc}</p>
+
+                    <div className="flex flex-wrap gap-1.5 mb-5">
                       {subject.labs.slice(0, 3).map(lab => (
                         <span key={lab.id} className="text-[11px] font-mono text-chalk/80 bg-ink border border-rule-dark rounded-[2px] px-2 py-0.5">{lab.title}</span>
                       ))}
-                      {subject.labs.length > 3 && <span className="text-[11px] font-mono text-chalk/60 px-1 py-0.5">+{subject.labs.length - 3}</span>}
+                      {subject.labs.length > 3 && (
+                        <span className="text-[11px] font-mono text-chalk/60 px-1 py-0.5">
+                          +{subject.labs.length - 3}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-mono font-medium text-verdigris group-hover:underline">
+
+                  <div className="flex items-center justify-between pt-3 border-t border-rule-dark/60 text-xs font-mono font-medium text-sky group-hover:underline">
                     <span>{t.subjectsExplore}</span>
                     <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
                   </div>
