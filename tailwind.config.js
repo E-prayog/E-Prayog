@@ -12,97 +12,55 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        display: ['Sora', 'system-ui', 'sans-serif'],
-        mono:    ['JetBrains Mono', 'monospace'],
+        sans: ['"Hanken Grotesk"', 'system-ui', 'sans-serif'],
+        display: ['"Fraunces"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+        kannada: ['"Noto Sans Kannada"', 'sans-serif'],
+        devanagari: ['"Noto Sans Devanagari"', 'sans-serif'],
       },
       colors: {
-        /* ── Obsidian Canvas System ── */
-        canvas:  '#070A0F',
-        surface: '#0D1117',
-        card:    '#121824',
-        elevated:'#1A2233',
-        glass: {
-          100: 'rgba(18, 24, 36, 0.40)',
-          200: 'rgba(18, 24, 36, 0.65)',
-          300: 'rgba(18, 24, 36, 0.85)',
+        ink: {
+          DEFAULT: '#070B14',
+          2: '#0E1626',
         },
-        /* ── Lab Cyan Accent (Primary) ── */
-        lab: {
-          cyan:    '#06B6D4',
-          bright:  '#22D3EE',
-          muted:   '#0891B2',
-          dim:     '#164E63',
-          glow:    'rgba(6, 182, 212, 0.35)',
+        paper: {
+          DEFAULT: '#F0F6FC',
+          2: '#162035',
         },
-        /* ── Tactical Amber (Rare Secondary) ── */
-        tactical: {
-          DEFAULT: '#F59E0B',
-          light:   '#FBBF24',
-          dark:    '#D97706',
+        chalk: '#94A3B8',
+        verdigris: {
+          DEFAULT: '#87CEEB',
+          deep: '#5DADE2',
         },
-        /* ── Neutrals ── */
-        slate: {
-          950: '#070A0F',
-          900: '#0D1117',
-          850: '#121824',
-          800: '#1A2233',
-          700: '#253347',
-          600: '#334155',
-          500: '#475569',
-          400: '#94A3B8',
-          300: '#CBD5E1',
-          200: '#E2E8F0',
-        },
-        /* ── Legacy brand tokens (preserved for non-home pages) ── */
+        'verdigris-deep': '#5DADE2',
         sky: {
-          accent: '#06B6D4',
-          light:  '#22D3EE',
-          muted:  '#0891B2',
-          dim:    '#164E63',
+          DEFAULT: '#87CEEB',
+          deep: '#5DADE2',
         },
-        gold: {
-          DEFAULT: '#F59E0B',
-          light:   '#FBBF24',
-          dark:    '#D97706',
+        brass: '#87CEEB',
+        rule: {
+          dark: 'rgba(135, 206, 235, 0.16)',
+          light: 'rgba(93, 173, 226, 0.20)',
         },
-        brand: {
-          50:  '#E8F4FD',
-          100: '#C5DFF5',
-          200: '#06B6D4',
-          500: '#0891B2',
-          600: '#0E7490',
-          900: '#070A0F',
-        },
-        subject: {
-          physics:   '#5BA3D4',
-          chemistry: '#F5A623',
-          biology:   '#5BB887',
-          math:      '#A78BFA',
-          cs:        '#60C4D4',
-        }
+        /* Fallbacks & contextual tokens */
+        canvas: '#070B14',
+        surface: '#0E1626',
+        card: '#0E1626',
+        elevated: '#162035',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
       animation: {
         'float': 'float 6s ease-in-out infinite',
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'spin-slow': 'spin 12s linear infinite',
-        'gradient-x': 'gradient-x 15s ease infinite',
       },
       keyframes: {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-20px)' },
         },
-        'gradient-x': {
-          '0%, 100%': {
-              'background-size': '200% 200%',
-              'background-position': 'left center'
-          },
-          '50%': {
-              'background-size': '200% 200%',
-              'background-position': 'right center'
-          },
-        }
       }
     },
   },

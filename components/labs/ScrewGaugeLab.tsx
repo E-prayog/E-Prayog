@@ -1,196 +1,1179 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { RotateCcw, Lock, Unlock, ZoomIn, CheckCircle2 } from 'lucide-react';
 
-const pitch = 0.5, divs = 50;
-const LC = pitch / divs;
+// Objects available for measurement
+const OBJECTS = {
+  wire: { id: 'wire', label: 'Copper Wire', trueDiameter: 1.24, color: '#EA580C', type: 'cylinder' },
+  ball: { id: 'ball', label: 'Ball Bearing', trueDiameter: 4.38, color: '#94A3B8', type: 'sphere' },
+  plate: { id: 'plate', label: 'Glass Plate', trueDiameter: 0.85, color: '#38BDF8', type: 'plate' },
+  leadShot: { id: 'leadShot', label: 'Lead Shot', trueDiameter: 2.76, color: '#475569', type: 'sphere' },
+  zeroCheck: { id: 'zeroCheck', label: 'Zero Check (None)', trueDiameter: 0.0, color: 'transparent', type: 'none' },
+};
 
-const ScrewGaugeLab: React.FC = () => {
+type ObjectKey = keyof typeof OBJECTS;
+
+interface ObservationRow {
+  srNo: number;
+  object: string;
+  msr: number;
+  csr: number;
+  totalReading: number;
+  correctedReading: number;
+}
+
+export default function ScrewGaugeLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [rotation, setRotation] = useState(38);
-  const diameter_mm = (rotation / divs) * pitch;
-  const psr = Math.floor(diameter_mm / pitch) * pitch;
-  const csr = Math.round((diameter_mm - psr) / LC);
-  const reading = psr + csr * LC;
+  const animRef = useRef<number>(0);
 
-  useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+  // Simulation parameters: Pitch = 0.5 mm, 50 divisions => Least Count = 0.01 mm
+  const PITCH = 0.5;
+  const DIVISIONS = 50;
+  const LEAST_COUNT = PITCH / DIVISIONS; // 0.01 mm
 
-    // Dark lab background
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#07090f'); bg.addColorStop(1, '#040507');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // Internal physical state in ref for 60fps canvas loop
+  const simState = useRef({
+    gap: 8.0, // mm (current opening between anvil and spindle)
+    selectedObject: 'wire' as ObjectKey,
+    isLocked: false,
+    zeroErrorDivs: 0, // divisions (+ve or -ve zero error)
+    isDraggingThimble: false,
+    dragStartY: 0,
+    dragStartGap: 8.0,
+    ratchetEngaged: false,
+    ratchetFlashTimer: 0,
+    touchGlowTimer: 0,
+    hoveredPart: null as string | null,
+    zoomLensActive: true,
+  });
 
-    const cy = H / 2 - 10;
+  // UI state for React display cards
+  const [uiState, setUiState] = useState({
+    gap: 8.0,
+    selectedObject: 'wire' as ObjectKey,
+    isLocked: false,
+    zeroErrorDivs: 0,
+    msr: 8.0,
+    csr: 0,
+    observedReading: 8.0,
+    zeroCorrection: 0,
+    correctedReading: 8.0,
+    ratchetEngaged: false,
+    zoomLensActive: true,
+  });
 
-    // ── U-Frame (steel body) ──
-    const frameGrad = ctx.createLinearGradient(30, cy - 60, 200, cy + 60);
-    frameGrad.addColorStop(0, '#1e293b'); frameGrad.addColorStop(0.4, '#334155');
-    frameGrad.addColorStop(0.6, '#475569'); frameGrad.addColorStop(1, '#1e293b');
+  const [observations, setObservations] = useState<ObservationRow[]>([]);
+  const [activeTab, setActiveTab] = useState<'controls' | 'table'>('controls');
 
-    ctx.fillStyle = frameGrad;
-    // Left vertical
-    ctx.beginPath(); ctx.roundRect(30, cy - 65, 22, 130, 6); ctx.fill();
-    // Bottom horizontal
-    ctx.beginPath(); ctx.roundRect(30, cy + 50, 160, 22, 4); ctx.fill();
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(30, cy - 65, 22, 130, 6); ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(30, cy + 50, 160, 22, 4); ctx.stroke();
+  // Helper to sync ref state with React UI
+  const syncUI = useCallback(() => {
+    const s = simState.current;
+    const currentGap = s.gap;
 
-    // Frame shine
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath(); ctx.roundRect(33, cy - 62, 5, 120, 3); ctx.fill();
+    // Linear Main Scale Reading (multiples of 0.5 mm)
+    const msr = Math.floor(currentGap / PITCH) * PITCH;
 
-    // ── Anvil ──
-    const anvGrad = ctx.createLinearGradient(180, cy - 12, 220, cy + 12);
-    anvGrad.addColorStop(0, '#1e3a5f'); anvGrad.addColorStop(0.5, '#3b82f6'); anvGrad.addColorStop(1, '#1e3a5f');
-    ctx.fillStyle = anvGrad;
-    ctx.beginPath(); ctx.roundRect(178, cy - 12, 36, 24, 3); ctx.fill();
-    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1; ctx.stroke();
+    // Circular / Thimble Scale Reading (0 to 49)
+    // Fraction of pitch remaining divided by least count
+    const rem = currentGap - msr;
+    let csr = Math.round(rem / LEAST_COUNT) % DIVISIONS;
+    if (csr < 0) csr += DIVISIONS;
 
-    // ── Sleeve (barrel) ──
-    const sleeveX = 210, sleeveW = 120, sleeveH = 30;
-    const sleeveGrad = ctx.createLinearGradient(sleeveX, cy - sleeveH / 2, sleeveX, cy + sleeveH / 2);
-    sleeveGrad.addColorStop(0, '#1a2235'); sleeveGrad.addColorStop(0.3, '#2d4a6b');
-    sleeveGrad.addColorStop(0.5, '#4a7db5'); sleeveGrad.addColorStop(0.7, '#2d4a6b'); sleeveGrad.addColorStop(1, '#1a2235');
-    ctx.fillStyle = sleeveGrad;
-    ctx.beginPath(); ctx.roundRect(sleeveX, cy - sleeveH / 2, sleeveW, sleeveH, 4); ctx.fill();
-    ctx.strokeStyle = '#3b5070'; ctx.lineWidth = 1; ctx.stroke();
+    const observed = msr + csr * LEAST_COUNT;
+    const zeroCorr = -s.zeroErrorDivs * LEAST_COUNT;
+    const corrected = Math.max(0, observed + zeroCorr);
 
-    // Main scale divisions on sleeve
-    ctx.fillStyle = '#e2e8f0'; ctx.font = '8px Inter'; ctx.textAlign = 'center';
-    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 0.8;
-    for (let i = 0; i <= 6; i++) {
-      const mx = sleeveX + i * 18;
-      if (mx > sleeveX + sleeveW - 15) break;
-      ctx.beginPath(); ctx.moveTo(mx, cy + 1); ctx.lineTo(mx, cy + sleeveH / 2 - 2); ctx.stroke();
-      ctx.fillText(`${(i * 0.5).toFixed(1)}`, mx, cy + sleeveH / 2 + 10);
+    setUiState({
+      gap: currentGap,
+      selectedObject: s.selectedObject,
+      isLocked: s.isLocked,
+      zeroErrorDivs: s.zeroErrorDivs,
+      msr: Number(msr.toFixed(2)),
+      csr,
+      observedReading: Number(observed.toFixed(2)),
+      zeroCorrection: Number(zeroCorr.toFixed(2)),
+      correctedReading: Number(corrected.toFixed(2)),
+      ratchetEngaged: s.ratchetEngaged,
+      zoomLensActive: s.zoomLensActive,
+    });
+  }, [PITCH, DIVISIONS, LEAST_COUNT]);
+
+  // Adjust gap with boundary and ratchet collision detection
+  const adjustGap = useCallback((deltaMm: number) => {
+    const s = simState.current;
+    if (s.isLocked) return;
+
+    const objMin = OBJECTS[s.selectedObject].trueDiameter;
+    const newGap = s.gap + deltaMm;
+
+    if (deltaMm < 0 && newGap <= objMin + 0.001) {
+      // Reached object surface - engage ratchet!
+      s.gap = objMin;
+      s.ratchetEngaged = true;
+      s.ratchetFlashTimer = 15;
+      s.touchGlowTimer = 20;
+    } else {
+      s.gap = Math.max(objMin, Math.min(25.0, newGap));
+      s.ratchetEngaged = false;
     }
-    // Half-mm marks
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 0.5;
-    for (let i = 0; i < 12; i++) {
-      const mx = sleeveX + i * 9;
-      ctx.beginPath(); ctx.moveTo(mx, cy + 1); ctx.lineTo(mx, cy + 8); ctx.stroke();
-    }
-    // Datum line (red)
-    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(sleeveX, cy); ctx.lineTo(sleeveX + sleeveW, cy); ctx.stroke();
+    syncUI();
+  }, [syncUI]);
 
-    // ── Thimble ──
-    const thimbleX = Math.min(sleeveX + 20 + (diameter_mm / 2) * 55, sleeveX + sleeveW - 25);
-    const thW = 75, thH = 52;
-    const thGrad = ctx.createLinearGradient(thimbleX, cy - thH / 2, thimbleX + thW, cy + thH / 2);
-    thGrad.addColorStop(0, '#1a2235'); thGrad.addColorStop(0.25, '#2d4a6b');
-    thGrad.addColorStop(0.5, '#3d6494'); thGrad.addColorStop(0.75, '#2d4a6b'); thGrad.addColorStop(1, '#1a2235');
-    ctx.fillStyle = thGrad;
-    ctx.beginPath(); ctx.roundRect(thimbleX, cy - thH / 2, thW, thH, 5); ctx.fill();
-    ctx.strokeStyle = '#4a7db5'; ctx.lineWidth = 1; ctx.stroke();
+  // Canvas drawing loop
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Thimble circular scale markings
-    const visR = 12;
-    for (let i = -visR; i <= visR; i++) {
-      const div = ((csr + i) % 50 + 50) % 50;
-      const y = cy + i * (thH / 2 / visR);
-      if (y < cy - thH / 2 + 4 || y > cy + thH / 2 - 4) continue;
-      const isMajor = div % 5 === 0;
-      const isActive = i === 0;
-      ctx.strokeStyle = isActive ? '#10b981' : isMajor ? '#94a3b8' : '#475569';
-      ctx.lineWidth = isActive ? 2 : isMajor ? 1.2 : 0.5;
-      ctx.beginPath(); ctx.moveTo(thimbleX + 2, y); ctx.lineTo(thimbleX + (isMajor ? 20 : 12), y); ctx.stroke();
-      if (isMajor) {
-        ctx.fillStyle = isActive ? '#10b981' : '#94a3b8';
-        ctx.font = isActive ? 'bold 9px Inter' : '8px Inter';
-        ctx.textAlign = 'left';
-        ctx.fillText(`${div}`, thimbleX + 23, y + 3);
+    const s = simState.current;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Decay visual timers
+    if (s.ratchetFlashTimer > 0) s.ratchetFlashTimer--;
+    if (s.touchGlowTimer > 0) s.touchGlowTimer--;
+
+    // ── 1. Lab Bench Background ──
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle dot grid (real lab bench)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+    const dotSpacing = 24;
+    for (let x = 12; x < W; x += dotSpacing) {
+      for (let y = 12; y < H; y += dotSpacing) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
-    // Active line pointer on sleeve
-    ctx.shadowBlur = 6; ctx.shadowColor = '#10b981';
-    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(thimbleX - 12, cy); ctx.lineTo(thimbleX + 2, cy); ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Ratchet
-    const ratGrad = ctx.createLinearGradient(thimbleX + thW, cy - 14, thimbleX + thW + 40, cy + 14);
-    ratGrad.addColorStop(0, '#1a2235'); ratGrad.addColorStop(0.5, '#2d4a6b'); ratGrad.addColorStop(1, '#1a2235');
-    ctx.fillStyle = ratGrad;
-    ctx.beginPath(); ctx.roundRect(thimbleX + thW - 2, cy - 14, 40, 28, 6); ctx.fill();
-    ctx.strokeStyle = '#3b5070'; ctx.lineWidth = 1; ctx.stroke();
-    // Knurl lines on ratchet
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 0.6;
-    for (let i = 0; i < 8; i++) {
-      const rx = thimbleX + thW + i * 4 + 4;
-      ctx.beginPath(); ctx.moveTo(rx, cy - 12); ctx.lineTo(rx, cy + 12); ctx.stroke();
+    // Subtle edge gradient shadow on bench
+    const benchShadow = ctx.createLinearGradient(0, H - 40, 0, H);
+    benchShadow.addColorStop(0, 'rgba(0,0,0,0)');
+    benchShadow.addColorStop(1, 'rgba(0,0,0,0.03)');
+    ctx.fillStyle = benchShadow;
+    ctx.fillRect(0, H - 40, W, 40);
+
+    // ── Coordinate Layout Constants ──
+    const centerY = H / 2 - 10;
+    const anvilX = 220; // X position of the anvil face
+    const pxPerMm = 14; // pixels per millimeter on main scale
+    const spindleX = anvilX + s.gap * pxPerMm; // X position of spindle face
+    const sleeveStartX = 420; // Fixed starting X of barrel/sleeve
+    const thimbleStartX = sleeveStartX + s.gap * pxPerMm; // Thimble shifts right as spindle opens
+
+    // ── 2. Measurement Object in the Gap ──
+    const currentObj = OBJECTS[s.selectedObject];
+    if (currentObj.type !== 'none' && currentObj.trueDiameter > 0) {
+      const objWidthPx = currentObj.trueDiameter * pxPerMm;
+      const objCenterX = anvilX + objWidthPx / 2;
+      const objRadiusPx = Math.min(objWidthPx / 2, 45);
+
+      ctx.save();
+      // Drop shadow on bench
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 12;
+
+      if (currentObj.type === 'sphere') {
+        const radGrad = ctx.createRadialGradient(
+          objCenterX - objRadiusPx * 0.3,
+          centerY - objRadiusPx * 0.3,
+          objRadiusPx * 0.1,
+          objCenterX,
+          centerY,
+          objRadiusPx
+        );
+        radGrad.addColorStop(0, '#FFFFFF');
+        radGrad.addColorStop(0.3, currentObj.color);
+        radGrad.addColorStop(0.85, '#334155');
+        radGrad.addColorStop(1, '#0F172A');
+
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(objCenterX, centerY, objRadiusPx, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#64748B';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (currentObj.type === 'cylinder') {
+        // Copper wire
+        const wireH = 110;
+        const wireGrad = ctx.createLinearGradient(
+          anvilX,
+          centerY - wireH / 2,
+          anvilX + objWidthPx,
+          centerY + wireH / 2
+        );
+        wireGrad.addColorStop(0, '#FB923C');
+        wireGrad.addColorStop(0.4, '#EA580C');
+        wireGrad.addColorStop(0.8, '#C2410C');
+        wireGrad.addColorStop(1, '#7C2D12');
+
+        ctx.fillStyle = wireGrad;
+        ctx.beginPath();
+        ctx.roundRect(anvilX, centerY - wireH / 2, objWidthPx, wireH, 3);
+        ctx.fill();
+
+        ctx.strokeStyle = '#9A3412';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (currentObj.type === 'plate') {
+        // Glass/Metal Plate
+        const plateH = 120;
+        const plateGrad = ctx.createLinearGradient(
+          anvilX,
+          centerY - plateH / 2,
+          anvilX + objWidthPx,
+          centerY + plateH / 2
+        );
+        plateGrad.addColorStop(0, 'rgba(56, 189, 248, 0.7)');
+        plateGrad.addColorStop(0.5, 'rgba(14, 165, 233, 0.5)');
+        plateGrad.addColorStop(1, 'rgba(2, 132, 199, 0.8)');
+
+        ctx.fillStyle = plateGrad;
+        ctx.beginPath();
+        ctx.roundRect(anvilX, centerY - plateH / 2, objWidthPx, plateH, 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#0284C7';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
-    // Object between anvil & spindle
-    if (diameter_mm > 0.05) {
-      const objCx = 200 + (thimbleX - 200) / 2;
-      const objR = Math.min((thimbleX - 210) / 2 - 2, 9);
-      if (objR > 1.5) {
-        const oGrad = ctx.createRadialGradient(objCx - objR * 0.3, cy - objR * 0.3, 0, objCx, cy, objR);
-        oGrad.addColorStop(0, '#e2e8f0'); oGrad.addColorStop(0.5, '#94a3b8'); oGrad.addColorStop(1, '#334155');
-        ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(148,163,184,0.4)';
-        ctx.fillStyle = oGrad;
-        ctx.beginPath(); ctx.arc(objCx, cy, objR, 0, Math.PI * 2); ctx.fill();
+    // ── 3. Contact Glow on Faces (when touching) ──
+    const isTouching = s.gap <= currentObj.trueDiameter + 0.02;
+    if (isTouching && currentObj.type !== 'none') {
+      ctx.save();
+      ctx.shadowColor = '#0EA5E9';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 3;
+
+      // Anvil contact line
+      ctx.beginPath();
+      ctx.moveTo(anvilX, centerY - 24);
+      ctx.lineTo(anvilX, centerY + 24);
+      ctx.stroke();
+
+      // Spindle contact line
+      ctx.beginPath();
+      ctx.moveTo(spindleX, centerY - 24);
+      ctx.lineTo(spindleX, centerY + 24);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── 4. Photorealistic Micrometer Body ──
+
+    // A. Cast U-Frame
+    ctx.save();
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.18)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
+
+    const frameGrad = ctx.createLinearGradient(60, centerY - 140, 360, centerY + 160);
+    frameGrad.addColorStop(0, '#F1F5F9'); // Outer metallic edge
+    frameGrad.addColorStop(0.18, '#CBD5E1');
+    frameGrad.addColorStop(0.5, '#64748B'); // Main dark steel body
+    frameGrad.addColorStop(0.82, '#334155');
+    frameGrad.addColorStop(1, '#1E293B');
+
+    // Draw solid U-frame path
+    ctx.fillStyle = frameGrad;
+    ctx.beginPath();
+    ctx.moveTo(anvilX, centerY - 26);
+    ctx.lineTo(140, centerY - 26);
+    ctx.bezierCurveTo(70, centerY - 26, 60, centerY + 140, 240, centerY + 140);
+    ctx.bezierCurveTo(340, centerY + 140, 370, centerY + 60, 370, centerY + 26);
+    ctx.lineTo(sleeveStartX, centerY + 26);
+    ctx.lineTo(sleeveStartX, centerY - 26);
+    ctx.lineTo(370, centerY - 26);
+    ctx.bezierCurveTo(340, centerY - 20, 300, centerY + 80, 240, centerY + 80);
+    ctx.bezierCurveTo(150, centerY + 80, 140, centerY + 20, anvilX, centerY + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Metallic outer bevel stroke
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Chrome highlight inner stroke
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(240, centerY + 138, 140, Math.PI * 0.8, Math.PI * 1.8, true);
+    ctx.stroke();
+
+    // Lab nameplate on frame
+    ctx.fillStyle = '#0F172A';
+    ctx.font = 'bold 10px "Plus Jakarta Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('E-PRAYOG 0-25mm', 220, centerY + 115);
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.fillText('LC = 0.01 mm (0.5mm / 50 div)', 220, centerY + 130);
+
+    ctx.restore();
+
+    // B. Anvil (Left Fixed Face)
+    ctx.save();
+    const anvilGrad = ctx.createLinearGradient(anvilX - 35, centerY - 16, anvilX, centerY + 16);
+    anvilGrad.addColorStop(0, '#CBD5E1');
+    anvilGrad.addColorStop(0.5, '#F8FAFC');
+    anvilGrad.addColorStop(1, '#94A3B8');
+    ctx.fillStyle = anvilGrad;
+    ctx.beginPath();
+    ctx.roundRect(anvilX - 35, centerY - 16, 35, 32, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Hardened carbide face tip on anvil
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(anvilX - 3, centerY - 16, 3, 32);
+    ctx.restore();
+
+    // C. Spindle (Movable Shaft from Sleeve to Spindle Face)
+    ctx.save();
+    const spindleW = sleeveStartX + 50 - spindleX;
+    if (spindleW > 0) {
+      const spindleGrad = ctx.createLinearGradient(spindleX, centerY - 16, spindleX, centerY + 16);
+      spindleGrad.addColorStop(0, '#F1F5F9');
+      spindleGrad.addColorStop(0.3, '#E2E8F0');
+      spindleGrad.addColorStop(0.7, '#94A3B8');
+      spindleGrad.addColorStop(1, '#475569');
+
+      ctx.fillStyle = spindleGrad;
+      ctx.beginPath();
+      ctx.roundRect(spindleX, centerY - 16, spindleW, 32, 2);
+      ctx.fill();
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Carbide face tip on spindle
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(spindleX, centerY - 16, 3, 32);
+    }
+    ctx.restore();
+
+    // D. Lock Lever on Frame
+    ctx.save();
+    const lockX = 390;
+    const lockY = centerY - 32;
+    ctx.fillStyle = s.isLocked ? '#F59E0B' : '#64748B';
+    ctx.beginPath();
+    ctx.roundRect(lockX - 7, lockY - 14, 14, 20, 3);
+    ctx.fill();
+    ctx.strokeStyle = '#1E293B';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Small lever arm
+    ctx.save();
+    ctx.translate(lockX, lockY - 4);
+    ctx.rotate(s.isLocked ? -Math.PI / 4 : 0);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-3, -16, 6, 16);
+    ctx.fillStyle = '#F8FAFC';
+    ctx.beginPath();
+    ctx.arc(0, -16, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+
+    // E. Sleeve / Barrel (Main Scale)
+    const sleeveLength = 25 * pxPerMm + 60; // accommodates 0-25mm scale + margin
+    const sleeveH = 46;
+    const sleeveY = centerY - sleeveH / 2;
+
+    ctx.save();
+    const sleeveGrad = ctx.createLinearGradient(sleeveStartX, sleeveY, sleeveStartX, sleeveY + sleeveH);
+    sleeveGrad.addColorStop(0, '#FFFFFF');
+    sleeveGrad.addColorStop(0.2, '#F1F5F9');
+    sleeveGrad.addColorStop(0.5, '#E2E8F0');
+    sleeveGrad.addColorStop(0.85, '#CBD5E1');
+    sleeveGrad.addColorStop(1, '#94A3B8');
+
+    ctx.fillStyle = sleeveGrad;
+    ctx.beginPath();
+    ctx.roundRect(sleeveStartX, sleeveY, sleeveLength, sleeveH, 3);
+    ctx.fill();
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Horizontal Datum Reference Line (Black / Dark Slate)
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sleeveStartX + 10, centerY);
+    ctx.lineTo(sleeveStartX + sleeveLength - 10, centerY);
+    ctx.stroke();
+
+    // Main Scale Markings on Sleeve
+    // Visible up to thimbleStartX
+    ctx.fillStyle = '#0F172A';
+    ctx.strokeStyle = '#0F172A';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+
+    for (let mm = 0; mm <= 25; mm++) {
+      const markX = sleeveStartX + 20 + mm * pxPerMm;
+      if (markX > thimbleStartX - 2) break; // Covered by thimble
+
+      // 1 mm marks ABOVE datum line
+      const isMajor = mm % 5 === 0;
+      const tickH = isMajor ? 14 : 9;
+
+      ctx.lineWidth = isMajor ? 1.4 : 0.9;
+      ctx.beginPath();
+      ctx.moveTo(markX, centerY);
+      ctx.lineTo(markX, centerY - tickH);
+      ctx.stroke();
+
+      if (isMajor) {
+        ctx.fillText(`${mm}`, markX, centerY - tickH - 4);
+      }
+
+      // 0.5 mm marks BELOW datum line
+      if (mm < 25) {
+        const halfMarkX = markX + 0.5 * pxPerMm;
+        if (halfMarkX < thimbleStartX - 2) {
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(halfMarkX, centerY);
+          ctx.lineTo(halfMarkX, centerY + 8);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+
+    // F. Thimble (Rotary Barrel with 50 divisions)
+    const thimbleW = 120;
+    const thimbleH = 68;
+    const thimbleY = centerY - thimbleH / 2;
+    const bevelW = 18;
+
+    ctx.save();
+    // Drop shadow under thimble
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    // Thimble cylindrical body gradient
+    const thimbleGrad = ctx.createLinearGradient(thimbleStartX, thimbleY, thimbleStartX, thimbleY + thimbleH);
+    thimbleGrad.addColorStop(0, '#FFFFFF');
+    thimbleGrad.addColorStop(0.2, '#E2E8F0');
+    thimbleGrad.addColorStop(0.5, '#94A3B8');
+    thimbleGrad.addColorStop(0.8, '#475569');
+    thimbleGrad.addColorStop(1, '#1E293B');
+
+    // Thimble Body with beveled leading edge
+    ctx.fillStyle = thimbleGrad;
+    ctx.beginPath();
+    ctx.moveTo(thimbleStartX + bevelW, thimbleY);
+    ctx.lineTo(thimbleStartX + thimbleW, thimbleY);
+    ctx.lineTo(thimbleStartX + thimbleW, thimbleY + thimbleH);
+    ctx.lineTo(thimbleStartX + bevelW, thimbleY + thimbleH);
+    ctx.lineTo(thimbleStartX, centerY + sleeveH / 2 + 3);
+    ctx.lineTo(thimbleStartX, centerY - sleeveH / 2 - 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Knurling texture on rear of thimble
+    ctx.save();
+    ctx.fillStyle = '#64748B';
+    const knurlX = thimbleStartX + bevelW + 28;
+    const knurlW = thimbleW - bevelW - 38;
+    ctx.fillRect(knurlX, thimbleY + 3, knurlW, thimbleH - 6);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    for (let kx = knurlX + 2; kx < knurlX + knurlW - 2; kx += 4) {
+      ctx.fillRect(kx, thimbleY + 3, 1.5, thimbleH - 6);
+    }
+    ctx.restore();
+
+    // Circular Scale Markings on the Bevel Edge of Thimble
+    // 50 divisions total. The division aligned with datum line is csr.
+    const rem = s.gap - Math.floor(s.gap / PITCH) * PITCH;
+    const rawCsr = (rem / LEAST_COUNT) % DIVISIONS;
+    const alignedDiv = Math.round(rawCsr) % DIVISIONS;
+
+    ctx.save();
+    const visDivRange = 14; // Visible divisions above and below center
+    const divPitchPx = (thimbleH * 0.45) / visDivRange;
+
+    for (let offset = -visDivRange; offset <= visDivRange; offset++) {
+      const divNum = Math.floor(((alignedDiv + offset) % DIVISIONS + DIVISIONS) % DIVISIONS);
+      const markY = centerY - offset * divPitchPx;
+
+      if (markY < thimbleY + 6 || markY > thimbleY + thimbleH - 6) continue;
+
+      const isAligned = offset === 0;
+      const isMajor = divNum % 5 === 0;
+      const tickLength = isMajor ? 14 : 8;
+
+      if (isAligned) {
+        // Highlighting aligned division in sky-blue
+        ctx.strokeStyle = '#0EA5E9';
+        ctx.lineWidth = 2.4;
+        ctx.shadowColor = 'rgba(14, 165, 233, 0.8)';
+        ctx.shadowBlur = 8;
+      } else {
+        ctx.strokeStyle = isMajor ? '#0F172A' : '#475569';
+        ctx.lineWidth = isMajor ? 1.2 : 0.8;
         ctx.shadowBlur = 0;
       }
+
+      ctx.beginPath();
+      ctx.moveTo(thimbleStartX + 2, markY);
+      ctx.lineTo(thimbleStartX + 2 + tickLength, markY);
+      ctx.stroke();
+
+      if (isMajor) {
+        ctx.fillStyle = isAligned ? '#0EA5E9' : '#0F172A';
+        ctx.font = isAligned
+          ? 'bold 10px "JetBrains Mono", monospace'
+          : '9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${divNum}`, thimbleStartX + tickLength + 5, markY + 3);
+      }
+    }
+    ctx.restore();
+
+    // G. Ratchet Stop Knob at the far right
+    const ratchetX = thimbleStartX + thimbleW;
+    const ratchetW = 42;
+    const ratchetH = 38;
+    const ratchetY = centerY - ratchetH / 2;
+
+    ctx.save();
+    const ratchetGrad = ctx.createLinearGradient(ratchetX, ratchetY, ratchetX, ratchetY + ratchetH);
+    ratchetGrad.addColorStop(0, '#F1F5F9');
+    ratchetGrad.addColorStop(0.3, '#CBD5E1');
+    ratchetGrad.addColorStop(0.7, '#64748B');
+    ratchetGrad.addColorStop(1, '#334155');
+
+    ctx.fillStyle = ratchetGrad;
+    ctx.beginPath();
+    ctx.roundRect(ratchetX, ratchetY, ratchetW, ratchetH, [0, 6, 6, 0]);
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Ratchet knurling ridges
+    ctx.fillStyle = '#475569';
+    for (let rx = ratchetX + 6; rx < ratchetX + ratchetW - 6; rx += 4) {
+      ctx.fillRect(rx, ratchetY + 2, 1.5, ratchetH - 4);
     }
 
-    // Bench
-    const bench = ctx.createLinearGradient(0, H - 20, 0, H);
-    bench.addColorStop(0, '#3d2a1a'); bench.addColorStop(1, '#2a1d0f');
-    ctx.fillStyle = bench; ctx.fillRect(0, H - 20, W, 20);
-    ctx.strokeStyle = '#5c3d1e'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, H - 20); ctx.lineTo(W, H - 20); ctx.stroke();
+    // Ratchet Slip Flash (when engaged)
+    if (s.ratchetFlashTimer > 0) {
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+      ctx.shadowColor = '#F59E0B';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.roundRect(ratchetX - 2, ratchetY - 2, ratchetW + 4, ratchetH + 4, 8);
+      ctx.fill();
+    }
+    ctx.restore();
 
-    // Reading label
-    ctx.shadowBlur = 8; ctx.shadowColor = '#10b981';
-    ctx.fillStyle = '#10b981'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'center';
-    ctx.fillText(`Reading = PSR + (CSR × LC) = ${psr.toFixed(1)} + (${csr} × ${LC}) = ${reading.toFixed(2)} mm`, W / 2, H - 26);
-    ctx.shadowBlur = 0;
+    // ── 5. Circular Magnifier / Zoom Lens ──
+    if (s.zoomLensActive) {
+      const zoomCenterX = thimbleStartX - 10;
+      const zoomCenterY = centerY - 130;
+      const zoomRadius = 70;
 
-  }, [rotation, diameter_mm, psr, csr, reading]);
+      ctx.save();
+      // Drop shadow for floating lens
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = 10;
+
+      // Outer chrome bezel
+      const bezelGrad = ctx.createLinearGradient(
+        zoomCenterX - zoomRadius,
+        zoomCenterY - zoomRadius,
+        zoomCenterX + zoomRadius,
+        zoomCenterY + zoomRadius
+      );
+      bezelGrad.addColorStop(0, '#FFFFFF');
+      bezelGrad.addColorStop(0.5, '#94A3B8');
+      bezelGrad.addColorStop(1, '#334155');
+
+      ctx.fillStyle = bezelGrad;
+      ctx.beginPath();
+      ctx.arc(zoomCenterX, zoomCenterY, zoomRadius + 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glass background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(zoomCenterX, zoomCenterY, zoomRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.clip(); // Clip everything to inside magnifier
+
+      // Magnified datum line
+      ctx.strokeStyle = '#0EA5E9';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(zoomCenterX - zoomRadius, zoomCenterY);
+      ctx.lineTo(zoomCenterX + zoomRadius, zoomCenterY);
+      ctx.stroke();
+
+      // Magnified Sleeve markings on the left half of the lens
+      ctx.fillStyle = '#0F172A';
+      ctx.strokeStyle = '#0F172A';
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+
+      const zoomScale = 2.4;
+      const zoomMmPx = pxPerMm * zoomScale;
+
+      const currentMsr = Math.floor(s.gap / PITCH) * PITCH;
+      const sleeveEdgeLensX = zoomCenterX - 2;
+
+      // Draw last 2 visible main scale ticks
+      for (let i = -2; i <= 0; i++) {
+        const val = currentMsr + i * 0.5;
+        if (val < 0) continue;
+        const tickLensX = sleeveEdgeLensX - (currentMsr - val) * 2 * (zoomMmPx / 2);
+
+        const isWholeMm = Math.abs(val - Math.round(val)) < 0.01;
+        ctx.lineWidth = isWholeMm ? 2 : 1.2;
+        ctx.beginPath();
+        if (isWholeMm) {
+          ctx.moveTo(tickLensX, zoomCenterY);
+          ctx.lineTo(tickLensX, zoomCenterY - 24);
+          ctx.stroke();
+          ctx.fillText(`${val}`, tickLensX, zoomCenterY - 28);
+        } else {
+          ctx.moveTo(tickLensX, zoomCenterY);
+          ctx.lineTo(tickLensX, zoomCenterY + 16);
+          ctx.stroke();
+        }
+      }
+
+      // Magnified Thimble circular scale on right half of lens
+      const thimbleEdgeLensX = zoomCenterX + 2;
+      const zoomDivPitch = divPitchPx * zoomScale;
+
+      for (let offset = -5; offset <= 5; offset++) {
+        const divNum = Math.floor(((alignedDiv + offset) % DIVISIONS + DIVISIONS) % DIVISIONS);
+        const markY = zoomCenterY - offset * zoomDivPitch;
+
+        const isAligned = offset === 0;
+        const isMajor = divNum % 5 === 0;
+
+        ctx.strokeStyle = isAligned ? '#0EA5E9' : isMajor ? '#0F172A' : '#64748B';
+        ctx.lineWidth = isAligned ? 3 : isMajor ? 1.8 : 1.0;
+
+        ctx.beginPath();
+        ctx.moveTo(thimbleEdgeLensX, markY);
+        ctx.lineTo(thimbleEdgeLensX + (isMajor ? 26 : 14), markY);
+        ctx.stroke();
+
+        ctx.fillStyle = isAligned ? '#0EA5E9' : '#0F172A';
+        ctx.font = isAligned ? 'bold 12px "JetBrains Mono"' : '10px "JetBrains Mono"';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${divNum}`, thimbleEdgeLensX + 30, markY + 4);
+      }
+
+      // Lens glare reflection
+      const glareGrad = ctx.createLinearGradient(
+        zoomCenterX - zoomRadius,
+        zoomCenterY - zoomRadius,
+        zoomCenterX + zoomRadius,
+        zoomCenterY + zoomRadius
+      );
+      glareGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+      glareGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+      glareGrad.addColorStop(1, 'rgba(56, 189, 248, 0.1)');
+      ctx.fillStyle = glareGrad;
+      ctx.beginPath();
+      ctx.arc(zoomCenterX, zoomCenterY, zoomRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Magnifier connecting line to datum contact point
+      ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(zoomCenterX, zoomCenterY + zoomRadius + 4);
+      ctx.lineTo(thimbleStartX, centerY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── 6. On-Canvas HUD Badges ──
+    if (s.ratchetEngaged) {
+      ctx.save();
+      ctx.fillStyle = '#FEF3C7';
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.3)';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - 140, 24, 280, 36, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#B45309';
+      ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡ Ratchet engaged — reading locked!', W / 2, 46);
+      ctx.restore();
+    }
+  }, [PITCH, LEAST_COUNT, DIVISIONS]);
+
+  // Animation Loop
+  useEffect(() => {
+    let running = true;
+    const render = () => {
+      if (!running) return;
+      draw();
+      animRef.current = requestAnimationFrame(render);
+    };
+    animRef.current = requestAnimationFrame(render);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(animRef.current);
+    };
+  }, [draw]);
+
+  // Pointer Drag Handling on Thimble
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    const s = simState.current;
+    const centerY = canvas.height / 2 - 10;
+    const pxPerMm = 14;
+    const sleeveStartX = 420;
+    const thimbleStartX = sleeveStartX + s.gap * pxPerMm;
+
+    // Click on Lock Lever
+    const lockX = 390;
+    const lockY = centerY - 32;
+    if (Math.hypot(x - lockX, y - lockY) < 22) {
+      s.isLocked = !s.isLocked;
+      syncUI();
+      return;
+    }
+
+    // Drag on Thimble / Ratchet area
+    if (x >= thimbleStartX - 10 && x <= thimbleStartX + 180 && y >= centerY - 50 && y <= centerY + 50) {
+      s.isDraggingThimble = true;
+      s.dragStartY = y;
+      s.dragStartGap = s.gap;
+      canvas.setPointerCapture(e.pointerId);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    const s = simState.current;
+    if (s.isDraggingThimble && !s.isLocked) {
+      // Upward drag closes spindle (-gap), downward drag opens (+gap)
+      const deltaY = y - s.dragStartY;
+      const mmChange = (deltaY * 0.04); // sensitivity
+      adjustGap(mmChange);
+      s.dragStartY = y;
+    } else {
+      const centerY = canvas.height / 2 - 10;
+      const pxPerMm = 14;
+      const sleeveStartX = 420;
+      const thimbleStartX = sleeveStartX + s.gap * pxPerMm;
+
+      if (x >= thimbleStartX - 10 && x <= thimbleStartX + 180 && y >= centerY - 50 && y <= centerY + 50) {
+        canvas.style.cursor = s.isLocked ? 'not-allowed' : 'ns-resize';
+      } else if (Math.hypot(x - 390, y - (centerY - 32)) < 22) {
+        canvas.style.cursor = 'pointer';
+      } else {
+        canvas.style.cursor = 'default';
+      }
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const s = simState.current;
+    if (s.isDraggingThimble) {
+      s.isDraggingThimble = false;
+      const canvas = canvasRef.current;
+      if (canvas && canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+    }
+  };
+
+  // Reset to default gap
+  const resetApp = () => {
+    simState.current.gap = 8.0;
+    simState.current.isLocked = false;
+    simState.current.ratchetEngaged = false;
+    syncUI();
+  };
+
+  // Switch object
+  const selectObject = (key: ObjectKey) => {
+    simState.current.selectedObject = key;
+    simState.current.gap = Math.max(simState.current.gap, OBJECTS[key].trueDiameter + 2.0);
+    simState.current.ratchetEngaged = false;
+    syncUI();
+  };
+
+  // Record reading into table
+  const recordObservation = () => {
+    const newRow: ObservationRow = {
+      srNo: observations.length + 1,
+      object: OBJECTS[uiState.selectedObject].label,
+      msr: uiState.msr,
+      csr: uiState.csr,
+      totalReading: uiState.observedReading,
+      correctedReading: uiState.correctedReading,
+    };
+    setObservations(prev => [...prev.slice(-7), newRow]);
+  };
 
   return (
-    <div className="flex flex-col h-full gap-0" style={{ background: 'linear-gradient(160deg,#06080f 0%,#040507 100%)', borderRadius: '12px', overflow: 'hidden' }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(75,105,176,0.2)', background: 'rgba(7,9,15,0.9)' }}>
-        <div>
-          <h3 className="text-sm font-semibold text-white tracking-wide">🔩 Screw Gauge (Micrometer)</h3>
-          <p className="text-[10px] text-zinc-500 mt-0.5">Pitch = {pitch} mm &nbsp;|&nbsp; Divisions = {divs} &nbsp;|&nbsp; LC = {LC} mm</p>
+    <div className="w-full h-full min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col p-4 md:p-6 select-none font-sans">
+      {/* Top Header Bar */}
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-4 px-5 py-3.5 bg-[#111827] border border-sky-500/20 rounded-2xl shadow-xl shadow-sky-950/20">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-cyan-400 flex items-center justify-center text-slate-950 font-bold text-lg shadow-md shadow-sky-500/30">
+            SG
+          </div>
+          <div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+              Micrometer Screw Gauge (0–25 mm)
+            </h1>
+            <p className="text-xs text-slate-400">
+              Karnataka PUC Physics Practicals • Least Count = 0.01 mm
+            </p>
+          </div>
         </div>
-        <div className="text-xs font-mono px-3 py-1.5 rounded-lg" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-          {reading.toFixed(2)} mm
+
+        {/* Header Live Status Badges */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="px-3.5 py-1.5 bg-slate-900/90 rounded-xl border border-slate-700/60 flex items-center gap-2.5 text-xs">
+            <span className="text-slate-400">Lock:</span>
+            <span className={`font-semibold flex items-center gap-1 ${uiState.isLocked ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {uiState.isLocked ? <Lock size={13} /> : <Unlock size={13} />}
+              {uiState.isLocked ? 'LOCKED' : 'UNLOCKED'}
+            </span>
+          </div>
+
+          <div className="px-3.5 py-1.5 bg-sky-950/40 rounded-xl border border-sky-500/40 flex items-center gap-2 text-xs">
+            <span className="text-sky-300 font-medium">Reading:</span>
+            <span className="text-cyan-300 font-mono font-bold text-sm">
+              {uiState.correctedReading.toFixed(2)} mm
+            </span>
+          </div>
         </div>
       </div>
-      <canvas ref={canvasRef} width={640} height={300} className="w-full" style={{ display: 'block' }} />
-      <div className="px-4 py-3 flex flex-col gap-3 border-t" style={{ borderColor: 'rgba(75,105,176,0.12)', background: 'rgba(5,7,12,0.97)' }}>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-zinc-400 whitespace-nowrap">Rotate Thimble</span>
-          <input id="screwgauge-rotation-slider" type="range" min={0} max={150} step={1} value={rotation} onChange={e => setRotation(Number(e.target.value))} className="flex-1 h-1.5 rounded-full accent-violet-500" />
-          <span className="text-xs font-mono text-violet-400 w-20 text-right">{rotation} div</span>
+
+      {/* Main Simulation Canvas Viewport */}
+      <div className="flex-1 flex flex-col items-center justify-center relative bg-slate-900/60 border border-slate-800 rounded-2xl p-3 overflow-hidden shadow-2xl">
+        <div className="w-full max-w-5xl aspect-[960/480] relative rounded-xl overflow-hidden ring-1 ring-white/10 shadow-2xl bg-white">
+          <canvas
+            ref={canvasRef}
+            width={960}
+            height={480}
+            style={{ width: '100%', height: '100%', touchAction: 'none' }}
+            className="block select-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          />
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: 'PSR', val: `${psr.toFixed(1)} mm`, color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', border: 'rgba(148,163,184,0.15)' },
-            { label: 'CSR', val: `${csr} div`, color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)' },
-            { label: 'CSR × LC', val: `${(csr * LC).toFixed(2)} mm`, color: '#38bdf8', bg: 'rgba(56,189,248,0.08)', border: 'rgba(56,189,248,0.2)' },
-            { label: 'TOTAL', val: `${reading.toFixed(2)} mm`, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
-          ].map(m => (
-            <div key={m.label} className="rounded-xl p-2.5 text-center" style={{ background: m.bg, border: `1px solid ${m.border}` }}>
-              <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{m.label}</div>
-              <div className="text-sm font-bold font-mono mt-0.5" style={{ color: m.color }}>{m.val}</div>
+
+        {/* Quick Instructions Overlay */}
+        <div className="w-full max-w-5xl mt-2 px-2 flex justify-between items-center text-xs text-slate-400">
+          <span>💡 Drag the thimble vertically or use fine-tune buttons below. Ratchet slips upon contact.</span>
+          <button
+            onClick={() => {
+              simState.current.zoomLensActive = !simState.current.zoomLensActive;
+              syncUI();
+            }}
+            className="flex items-center gap-1 text-sky-400 hover:text-sky-300 transition-colors"
+          >
+            <ZoomIn size={14} /> {uiState.zoomLensActive ? 'Hide Magnifier' : 'Show Magnifier'}
+          </button>
+        </div>
+      </div>
+
+      {/* Interactive Controls & Tabbed Dashboard */}
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Left Column: Object & Rotation Controls (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col gap-3">
+          {/* Object Selector */}
+          <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4 shadow-lg">
+            <div className="flex justify-between items-center mb-2.5">
+              <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">Select Specimen</span>
+              <span className="text-xs text-slate-500">True: {OBJECTS[uiState.selectedObject].trueDiameter.toFixed(2)} mm</span>
             </div>
-          ))}
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(OBJECTS) as ObjectKey[]).map(key => {
+                const obj = OBJECTS[key];
+                const isSelected = uiState.selectedObject === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => selectObject(key)}
+                    className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-1 ${
+                      isSelected
+                        ? 'bg-sky-500/20 text-sky-300 border border-sky-500/60 shadow-md shadow-sky-950/40'
+                        : 'bg-slate-800/80 text-slate-400 border border-slate-700/50 hover:bg-slate-700/70 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>{obj.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fine Tuning & Rotary Buttons */}
+          <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col gap-3">
+            <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">Thimble Rotation & Lock</span>
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                onClick={() => adjustGap(-0.01)}
+                disabled={uiState.isLocked}
+                className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-bold text-slate-200 disabled:opacity-40"
+              >
+                -1 Div
+              </button>
+              <button
+                onClick={() => adjustGap(-0.05)}
+                disabled={uiState.isLocked}
+                className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-bold text-slate-200 disabled:opacity-40"
+              >
+                -5 Div
+              </button>
+              <button
+                onClick={() => adjustGap(0.01)}
+                disabled={uiState.isLocked}
+                className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-bold text-slate-200 disabled:opacity-40"
+              >
+                +1 Div
+              </button>
+              <button
+                onClick={() => adjustGap(0.05)}
+                disabled={uiState.isLocked}
+                className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-bold text-slate-200 disabled:opacity-40"
+              >
+                +5 Div
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                onClick={() => {
+                  simState.current.isLocked = !simState.current.isLocked;
+                  syncUI();
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                  uiState.isLocked
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                {uiState.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                {uiState.isLocked ? 'Spindle Locked' : 'Spindle Free'}
+              </button>
+
+              <button
+                onClick={resetApp}
+                className="py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/50 transition-all"
+              >
+                <RotateCcw size={14} /> Open / Reset
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px]" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
-          <span className="text-zinc-500">Formula:</span>
-          <span className="font-mono text-emerald-400">Reading = PSR + (CSR × LC) = {psr.toFixed(1)} + ({csr} × {LC}) = <strong>{reading.toFixed(2)} mm</strong></span>
+
+        {/* Center/Right Column: Live Measurements Card & Observation Table (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-3">
+          {/* Readings Card */}
+          <div className="bg-[#111827] border border-sky-500/30 rounded-2xl p-4 shadow-xl">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs uppercase tracking-wider text-sky-400 font-bold flex items-center gap-1.5">
+                <span>📊</span> Live Micrometer Readings
+              </h3>
+              <button
+                onClick={recordObservation}
+                className="py-1 px-3 bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold rounded-lg flex items-center gap-1 transition-all shadow-md shadow-sky-500/20"
+              >
+                <CheckCircle2 size={13} /> Record to Table
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-center">
+              {/* Main Scale Reading */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+                <span className="text-[11px] text-slate-400 block mb-1">MSR (mm)</span>
+                <span className="text-base font-mono font-bold text-sky-300">{uiState.msr.toFixed(2)}</span>
+                <span className="text-[10px] text-slate-500 block">linear sleeve</span>
+              </div>
+
+              {/* Circular Scale Reading */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+                <span className="text-[11px] text-slate-400 block mb-1">CSR (Div)</span>
+                <span className="text-base font-mono font-bold text-cyan-300">{uiState.csr}</span>
+                <span className="text-[10px] text-slate-500 block">coinciding div</span>
+              </div>
+
+              {/* Observed Reading */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+                <span className="text-[11px] text-slate-400 block mb-1">Observed (mm)</span>
+                <span className="text-base font-mono font-bold text-emerald-300">
+                  {uiState.observedReading.toFixed(2)}
+                </span>
+                <span className="text-[10px] text-slate-500 block">MSR + (CSR × LC)</span>
+              </div>
+
+              {/* Corrected Reading */}
+              <div className="bg-sky-950/50 border border-sky-500/40 rounded-xl p-2.5">
+                <span className="text-[11px] text-sky-300 font-semibold block mb-1">Corrected (mm)</span>
+                <span className="text-base font-mono font-bold text-sky-200">
+                  {uiState.correctedReading.toFixed(2)}
+                </span>
+                <span className="text-[10px] text-sky-400/80 block">Observed - Error</span>
+              </div>
+            </div>
+
+            {/* Zero Error Correction Setting */}
+            <div className="mt-3 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-slate-400">Zero Error Correction:</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    simState.current.zeroErrorDivs = Math.max(-5, simState.current.zeroErrorDivs - 1);
+                    syncUI();
+                  }}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 font-mono text-slate-300"
+                >
+                  -
+                </button>
+                <span className="font-mono text-amber-300 font-semibold min-w-[70px] text-center">
+                  {uiState.zeroErrorDivs > 0 ? `+${uiState.zeroErrorDivs}` : uiState.zeroErrorDivs} div ({(uiState.zeroErrorDivs * 0.01).toFixed(2)} mm)
+                </span>
+                <button
+                  onClick={() => {
+                    simState.current.zeroErrorDivs = Math.min(5, simState.current.zeroErrorDivs + 1);
+                    syncUI();
+                  }}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded border border-slate-700 font-mono text-slate-300"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabbed Observation Table & Theory */}
+          <div className="bg-[#111827] border border-slate-800 rounded-2xl p-4 shadow-lg flex-1">
+            <div className="flex gap-2 border-b border-slate-800 pb-2 mb-3 text-xs">
+              <button
+                onClick={() => setActiveTab('controls')}
+                className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                  activeTab === 'controls' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Formula & Least Count
+              </button>
+              <button
+                onClick={() => setActiveTab('table')}
+                className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                  activeTab === 'table' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Observation Table ({observations.length})
+              </button>
+            </div>
+
+            {activeTab === 'controls' ? (
+              <div className="space-y-2 text-xs text-slate-300">
+                <div className="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800 font-mono">
+                  <div className="text-sky-400 font-bold mb-1">📐 Fundamental Formulae:</div>
+                  <div>• Pitch = Distance moved / Number of rotations = 0.5 mm</div>
+                  <div>• Least Count (LC) = Pitch / Total Divisions = 0.5 mm / 50 = 0.01 mm</div>
+                  <div>• Observed Diameter = MSR + (CSR × LC)</div>
+                  <div>• Corrected Diameter = Observed Reading − Zero Error</div>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] text-left">
+                  <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="py-1.5 px-2">#</th>
+                      <th className="py-1.5 px-2">Specimen</th>
+                      <th className="py-1.5 px-2 font-mono">MSR (mm)</th>
+                      <th className="py-1.5 px-2 font-mono">CSR (div)</th>
+                      <th className="py-1.5 px-2 font-mono">Observed (mm)</th>
+                      <th className="py-1.5 px-2 font-mono">Corrected (mm)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {observations.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-4 text-slate-500">
+                          No observations recorded yet. Click "Record to Table" above.
+                        </td>
+                      </tr>
+                    ) : (
+                      observations.map((row) => (
+                        <tr key={row.srNo} className="border-b border-slate-800/60 hover:bg-slate-800/40">
+                          <td className="py-1 px-2 text-slate-400">{row.srNo}</td>
+                          <td className="py-1 px-2 text-sky-300 font-medium">{row.object}</td>
+                          <td className="py-1 px-2 font-mono">{row.msr.toFixed(2)}</td>
+                          <td className="py-1 px-2 font-mono">{row.csr}</td>
+                          <td className="py-1 px-2 font-mono">{row.totalReading.toFixed(2)}</td>
+                          <td className="py-1 px-2 font-mono text-emerald-400 font-bold">
+                            {row.correctedReading.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default ScrewGaugeLab;
+}

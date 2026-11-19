@@ -11,11 +11,16 @@ import { trackLabVisit, trackTabCompleted, trackQuizScore } from '../services/la
 import {
   ArrowLeft, ArrowRight, Target, BookOpen, ListChecks, Info, Youtube,
   FlaskConical, ClipboardList, CheckCircle2, Globe, HelpCircle, Brain,
-  Printer, ChevronLeft, ChevronRight,
+  Printer, ChevronLeft, ChevronRight, Edit3, Plus,
 } from 'lucide-react';
 import { m as motion } from 'framer-motion';
 import { useLang } from '../services/LanguageContext';
 import { quizData } from '../data/quizData';
+import { subscribeToLabQuiz, getDefaultQuizQuestions } from '../services/quizService';
+import { experimentVideos } from '../data/experimentVideos';
+import { escapeHtml } from '../services/validation';
+import { subscribeToCustomVideos } from '../services/videoService';
+import AdminVideoModal from '../components/admin/AdminVideoModal';
 
 
 const MotionDiv = motion.div as any;
@@ -52,7 +57,15 @@ const LabView: React.FC = () => {
   const [shuffledViva, setShuffledViva] = useState<any[]>([]);
 
   const printRef = useRef<HTMLDivElement>(null);
-  const { user, profileData } = useAuth();
+  const { user, role, profileData } = useAuth();
+  const isAdmin = role === 'Admin' || profileData?.role === 'Admin';
+  const [customVideos, setCustomVideos] = useState<Record<string, { videoId: string; title: string }>>({});
+  const [showAdminVideoModal, setShowAdminVideoModal] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeToCustomVideos(setCustomVideos);
+    return () => unsub();
+  }, []);
 
   const subject = SUBJECTS.find(s => s.id === subjectId);
   const lab = subject?.labs.find(l => l.id === labId);
@@ -103,8 +116,10 @@ const LabView: React.FC = () => {
     if (!printRef.current) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    const safeTitle = escapeHtml(lab.title);
+    const safeSubject = escapeHtml(subject.name);
     printWindow.document.write(`
-      <html><head><title>${lab.title} - Observation | E-Prayog</title>
+      <html><head><title>${safeTitle} - Observation | E-Prayog</title>
       <style>
         body { font-family: 'Inter', Arial, sans-serif; padding: 40px; color: #0f172a; }
         h1 { font-size: 22px; margin-bottom: 4px; }
@@ -136,83 +151,39 @@ const LabView: React.FC = () => {
     printWindow.print();
   };
 
-  // Setup Quiz and Viva
-  const labIdToQuizKey: Record<string, string> = {
-    // Physics
-    p1: 'vernierCalipers',
-    p2: 'simplePendulum',
-    p3: 'screwGauge',
-    p4: 'ohmsLaw',
-    p5: 'concaveMirror',
-    p6: 'convexLens',
-    p7: 'glassPrism',
-    p8: 'sonometer',
-    p9: 'metreBridge',
-    p10: 'potentiometer',
-    p11: 'zenerDiode',
-    p12: 'hookesLaw',
-    
-    // Chemistry
-    c1: 'acidBaseTitration',
-    c2: 'kmno4Titration',
-    c3: 'phOfSolutions',
-    c4: 'saltAnalysis',
-    c5: 'paperChromatography',
-    c6: 'enthalpyNeutralisation',
-    c7: 'rateOfReaction',
-    c8: 'cationAnalysis',
-    c9: 'anionAnalysis',
-    c10: 'crystallisation',
-
-    // Biology
-    b1: 'mitosis',
-    b2: 'stomata',
-    b3: 'osmosis',
-    b4: 'photosynthesis',
-    b5: 'dnaIsolation',
-    b6: 'benedictTest',
-    b7: 'bloodGroup',
-    b8: 'seedGermination',
-
-    // Math
-    m1: 'unitCircle',
-    m2: 'binomialTheorem',
-    m3: 'statistics',
-    m4: 'matrixOperations',
-    m5: 'probability',
-    m6: 'conicSections',
-
-    // CS
-    cs1: 'bubbleSort',
-    cs2: 'insertionSort',
-    cs3: 'binarySearch',
-    cs4: 'stackOperations',
-    cs5: 'queueOperations',
-    cs6: 'logicGates',
-  };
-
-  const getQuestions = () => {
-    if (!labId) return [];
-    const key = labIdToQuizKey[labId];
-    if (!key) return content?.quizQuestions || [];
-    
-    const rawQuestions = quizData[key];
-    if (!rawQuestions || rawQuestions.length === 0) {
-      return content?.quizQuestions || [];
-    }
-    
-    return rawQuestions.map((q) => ({
-      id: q.id as any,
+  // Real-time Quiz Questions (dynamic from Firestore custom quiz or standard defaults)
+  const [quizQuestions, setQuizQuestions] = useState<any[]>(() => {
+    return labId ? getDefaultQuizQuestions(labId).map(q => ({
+      id: q.id,
       question: q.question,
       options: q.options,
-      correctIndex: q.correctAnswer,
+      correctIndex: typeof q.correctAnswer === 'number' ? q.correctAnswer : (q as any).correctIndex ?? 0,
       explanation: q.explanation,
       level: q.level,
-      hint: q.hint
-    }));
-  };
+      hint: q.hint,
+    })) : [];
+  });
+  const [isCustomQuiz, setIsCustomQuiz] = useState<boolean>(false);
 
-  const quizQuestions = getQuestions();
+  useEffect(() => {
+    if (!labId) return;
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizScore(0);
+    const unsub = subscribeToLabQuiz(labId, (qs, custom) => {
+      setQuizQuestions(qs.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctIndex: typeof q.correctAnswer === 'number' ? q.correctAnswer : (q as any).correctIndex ?? 0,
+        explanation: q.explanation,
+        level: q.level,
+        hint: q.hint,
+      })));
+      setIsCustomQuiz(custom);
+    });
+    return () => unsub();
+  }, [labId]);
 
   const handleQuizSubmit = async () => {
     let score = 0;
@@ -296,39 +267,41 @@ const LabView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 lg:px-16">
+    <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 lg:px-16 bg-ink text-paper">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <Link to={`/subjects/${subject.id}`} className="text-sm text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-1 mb-3">
+        <div className="mb-8 pb-6 border-b border-rule-dark">
+          <Link to={`/subjects/${subject.id}`} className="text-xs font-mono text-chalk hover:text-paper transition-colors flex items-center gap-1.5 mb-3">
             <ArrowLeft size={14} /> {t.labBackTo} {subject.name}
           </Link>
-          <div className="flex items-center gap-3">
-            <EprayogLogo size={52} idSuffix={lab.id} />
+          <div className="flex items-center gap-4">
+            <div className="bg-ink p-1 rounded-[2px] border border-rule-dark">
+              <EprayogLogo size={44} idSuffix={lab.id} />
+            </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-display font-semibold text-white">{lab.title}</h1>
-              <p className="text-sm text-zinc-400">{lab.category} • {lab.difficulty} • {lab.duration}</p>
+              <h1 className="text-2xl md:text-3xl font-display font-normal text-paper tracking-tight">{lab.title}</h1>
+              <p className="text-xs font-mono text-chalk mt-1">{lab.category} • {lab.difficulty} • {lab.duration}</p>
             </div>
           </div>
         </div>
 
         {/* Step Indicator (numbered tabs) */}
-        <div className="flex gap-1 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-1.5 mb-8 overflow-x-auto pb-2 border-b border-rule-dark">
           {TABS.map((tab, idx) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setTabIdx(idx)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-[2px] text-xs font-mono whitespace-nowrap transition-colors border
                 ${tabIdx === idx
-                  ? 'bg-white/10 text-white border-white/20 shadow-lg'
+                  ? 'bg-ink-2 text-paper border-rule-dark underline underline-offset-4 decoration-verdigris font-medium'
                   : tabIdx > idx
-                    ? 'text-emerald-400/60 border-emerald-500/10 bg-emerald-500/5'
-                    : 'text-zinc-500 border-transparent hover:text-white hover:bg-white/5'
+                    ? 'text-verdigris border-rule-dark/50 bg-ink hover:text-paper'
+                    : 'text-chalk border-transparent hover:text-paper hover:bg-ink-2'
                 }`}
             >
-              <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                tabIdx === idx ? 'bg-white/20 text-white' : tabIdx > idx ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-zinc-600'
+              <span className={`size-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold flex-shrink-0 ${
+                tabIdx === idx ? 'bg-verdigris text-paper' : tabIdx > idx ? 'text-verdigris' : 'text-chalk/60'
               }`}>
                 {tabIdx > idx ? '✓' : idx + 1}
               </span>
@@ -429,31 +402,85 @@ const LabView: React.FC = () => {
 
               {/* YouTube Video */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                  <Youtube size={18} className="text-red-500" /> {t.labVideoDemo}
-                </h3>
-                {content.videoId ? (
-                  <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${content.videoId}`}
-                      title={`${lab.title} - Video Demo`}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3">
-                    <Youtube size={48} className="text-zinc-700" />
-                    <p className="text-sm text-zinc-500">{t.labVideoComingSoon}</p>
-                    <a
-                      href={`https://www.youtube.com/results?search_query=Karnataka+PUC+${encodeURIComponent(lab.title)}+experiment`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Youtube size={18} className="text-red-500" /> {t.labVideoDemo}
+                  </h3>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setShowAdminVideoModal(true)}
+                      className="px-2.5 py-1 rounded-md bg-[#87CEEB]/15 hover:bg-[#87CEEB]/25 border border-[#87CEEB]/30 text-[#87CEEB] text-xs font-medium flex items-center gap-1.5 transition-colors"
+                      title="Admin: Edit experiment video"
                     >
-                      {t.labSearchYouTube} <ArrowRight size={12} />
-                    </a>
-                  </div>
+                      <Edit3 size={13} />
+                      <span>Edit Video (Admin)</span>
+                    </button>
+                  )}
+                </div>
+
+                {(() => {
+                  // Resolve video: prefer customVideos, then experimentVideos map, then content.videoId
+                  const custom = labId ? customVideos[labId] : undefined;
+                  const staticEntry = labId ? experimentVideos[labId] : undefined;
+                  let resolvedVideoId: string | undefined = custom?.videoId || content.videoId;
+                  let resolvedTitle: string = custom?.title || `${lab.title} - Video Demo`;
+
+                  if (!resolvedVideoId && staticEntry) {
+                    if ('videoId' in staticEntry) {
+                      resolvedVideoId = staticEntry.videoId;
+                      resolvedTitle = staticEntry.title;
+                    } else {
+                      const langEntry = (staticEntry as any)[t.lang as string] || (staticEntry as any).en;
+                      if (langEntry) {
+                        resolvedVideoId = langEntry.videoId;
+                        resolvedTitle = langEntry.title;
+                      }
+                    }
+                  }
+
+                  return resolvedVideoId ? (
+                    <div className="aspect-video rounded-xl overflow-hidden border border-white/10">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${resolvedVideoId}`}
+                        title={resolvedTitle}
+                        className="w-full h-full"
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-col gap-3 p-6 text-center">
+                      <Youtube size={48} className="text-zinc-700" />
+                      <p className="text-sm text-zinc-400">{t.labVideoComingSoon}</p>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setShowAdminVideoModal(true)}
+                          className="mt-2 px-3.5 py-1.5 rounded-lg bg-[#87CEEB] text-[#070D18] hover:bg-[#5DADE2] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                          <Plus size={14} />
+                          <span>Add Video as Admin</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Admin Video Modal */}
+                {isAdmin && lab && (
+                  <AdminVideoModal
+                    isOpen={showAdminVideoModal}
+                    onClose={() => setShowAdminVideoModal(false)}
+                    labId={lab.id}
+                    labTitle={lab.title}
+                    initialVideoId={
+                      customVideos[lab.id]?.videoId ||
+                      (experimentVideos[lab.id] && 'videoId' in experimentVideos[lab.id]
+                        ? (experimentVideos[lab.id] as any).videoId
+                        : '')
+                    }
+                    initialTitle={customVideos[lab.id]?.title}
+                  />
                 )}
               </div>
             </div>
@@ -805,27 +832,26 @@ const LabView: React.FC = () => {
         </MotionDiv>
 
         {/* Navigation: Previous / Next */}
-        <div className="flex items-center justify-between mt-8 max-w-4xl">
+        <div className="flex items-center justify-between mt-10 max-w-4xl pt-6 border-t border-rule-dark">
           <button
             type="button"
             onClick={goPrev}
             disabled={tabIdx === 0}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold transition-all hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-[2px] bg-ink-2 border border-rule-dark text-xs font-mono font-medium text-paper transition-colors hover:bg-ink disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            <ChevronLeft size={16} /> {tabIdx > 0 ? TABS[tabIdx - 1].label : t.labPrevious}
+            <ChevronLeft size={14} /> {tabIdx > 0 ? TABS[tabIdx - 1].label : t.labPrevious}
           </button>
 
-          <span className="text-xs text-zinc-500 font-mono">
+          <span className="text-xs text-chalk font-mono">
             {tabIdx + 1} / {TABS.length}
           </span>
 
           <button
             type="button"
             onClick={goNext}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 disabled:opacity-20 disabled:cursor-not-allowed"
-            style={{ background: `${subject.hex}20`, color: subject.hex, borderColor: `${subject.hex}30`, borderWidth: 1 }}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-[2px] bg-verdigris hover:bg-verdigris-deep text-paper text-xs font-mono font-medium transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            {tabIdx < TABS.length - 1 ? TABS[tabIdx + 1].label : t.labFinish} <ChevronRight size={16} />
+            {tabIdx < TABS.length - 1 ? TABS[tabIdx + 1].label : t.labFinish} <ChevronRight size={14} />
           </button>
         </div>
       </div>

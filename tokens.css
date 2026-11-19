@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&display=swap');
+
+/* ── Dark mode (default): Modern Midnight & Soft Sky Blue Science Palette ── */
+:root,
+[data-theme="dark"] {
+  --ink: #070B14;
+  --ink-2: #0E1626;
+  --paper: #F0F6FC;
+  --paper-2: #162035;
+  --chalk: #94A3B8;
+  --verdigris: #87CEEB;
+  --verdigris-deep: #5DADE2;
+  --sky: #87CEEB;
+  --sky-deep: #5DADE2;
+  --brass: #87CEEB;
+  --rule-dark: rgba(135, 206, 235, 0.16);
+  --rule-light: rgba(93, 173, 226, 0.20);
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-kannada: 'Noto Sans Kannada', sans-serif;
+  --font-devanagari: 'Noto Sans Devanagari', sans-serif;
+  color-scheme: dark;
+}
+
+/* ── Light mode ── */
+[data-theme="light"] {
+  --ink: #F8FAFC;
+  --ink-2: #F1F5F9;
+  --paper: #0F172A;
+  --paper-2: #E2E8F0;
+  --chalk: #475569;
+  --verdigris: #5DADE2;
+  --verdigris-deep: #2E86C1;
+  --sky: #5DADE2;
+  --sky-deep: #2E86C1;
+  --brass: #5DADE2;
+  --rule-dark: rgba(15, 23, 42, 0.12);
+  --rule-light: rgba(15, 23, 42, 0.14);
+  color-scheme: light;
+}

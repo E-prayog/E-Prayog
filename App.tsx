@@ -1,14 +1,33 @@
 import React, { lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './services/AuthContext';
 import { LanguageProvider } from './services/LanguageContext';
+import { ThemeProvider } from './services/ThemeContext';
 import { MotionConfig, LazyMotion, domAnimation } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import AIFloatingTutor from './components/AIFloatingTutor';
 import ProtectedRoute from './components/ProtectedRoute';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 import { ensureAdminExists } from './services/adminSetup';
-import { ReactLenis } from 'lenis/react';
+
+// Enforce scroll to top on every route change and initial mount
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if ((window as any).__lenis) {
+      (window as any).__lenis.scrollTo(0, { immediate: true });
+    }
+  }, [pathname]);
+
+  return null;
+};
 
 // Lazy-loaded pages
 const Home = lazy(() => import('./pages/Home'));
@@ -45,29 +64,69 @@ const BioDiagrams = lazy(() => import('./pages/tools/BioDiagrams'));
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
-      <div className="size-12 border-3 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+      <div className="size-12 rounded-full animate-spin" style={{ border: '3px solid rgba(56,189,248,0.15)', borderTopColor: '#38BDF8' }} />
       <p className="text-sm text-zinc-500 font-medium">Loading E-Prayog...</p>
     </div>
   </div>
 );
 
 const App: React.FC = () => {
-  // Initialize admin account on first load (idempotent)
+  // Initialize admin account on first load + disable browser auto scroll restoration
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     ensureAdminExists().catch(() => {});
   }, []);
 
+  // Motion & Lenis smooth scroll setup
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const lenis = new Lenis({
+      lerp: 0.1,
+      duration: 1.2,
+      smoothWheel: true,
+    });
+
+    lenis.scrollTo(0, { immediate: true });
+    (window as any).__lenis = lenis;
+
+    lenis.on('scroll', ScrollTrigger.update);
+
+    const tickerCallback = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+    gsap.ticker.add(tickerCallback);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(tickerCallback);
+      delete (window as any).__lenis;
+      lenis.destroy();
+    };
+  }, []);
+
   return (
-    <ReactLenis root options={{ lerp: 0.1, duration: 1.5, smoothWheel: true }}>
-      <LanguageProvider>
+    <ThemeProvider>
+    <LanguageProvider>
       <AuthProvider>
         <MotionConfig reducedMotion="user">
           <LazyMotion features={domAnimation}>
             <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-zinc-950 text-white">
-          <Navbar />
-          <main className="flex-1">
-            <React.Suspense fallback={<PageLoader />}>
+              <ScrollToTop />
+              <div className="min-h-screen flex flex-col bg-ink text-paper" style={{ background: 'var(--ink, #16140F)', color: 'var(--paper, #F1EBDD)' }}>
+                <Navbar />
+                <main className="flex-1">
+                  <React.Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* PUBLIC ROUTES */}
                 <Route path="/" element={<Navigate to="/home" replace />} />
@@ -85,10 +144,10 @@ const App: React.FC = () => {
                 <Route path="/tools/safety-guide" element={<SafetyGuide />} />
                 <Route path="/tools/bio-diagrams" element={<BioDiagrams />} />
 
-                {/* AUTH REQUIRED: any role */}
-                <Route path="/subjects" element={<ProtectedRoute><Subjects /></ProtectedRoute>} />
-                <Route path="/subjects/:subjectId" element={<ProtectedRoute><SubjectView /></ProtectedRoute>} />
-                <Route path="/subjects/:subjectId/:labId" element={<ProtectedRoute><LabView /></ProtectedRoute>} />
+                {/* PUBLIC: subjects & labs — no login required */}
+                <Route path="/subjects" element={<Subjects />} />
+                <Route path="/subjects/:subjectId" element={<SubjectView />} />
+                <Route path="/subjects/:subjectId/:labId" element={<LabView />} />
                 <Route path="/tutor" element={<ProtectedRoute><TutorPage /></ProtectedRoute>} />
                 <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -124,7 +183,7 @@ const App: React.FC = () => {
       </MotionConfig>
     </AuthProvider>
     </LanguageProvider>
-    </ReactLenis>
+    </ThemeProvider>
   );
 };
 

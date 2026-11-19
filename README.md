@@ -24,20 +24,21 @@ npm run preview
 
 Create a `.env` file in the project root:
 
-```env
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_GEMINI_API_KEY=...
-```
+See `.env.example` for names only. Copy it to `.env` and fill in values locally.
+
+Client (public in the browser bundle):
+- `VITE_FIREBASE_*` — Firebase web config. Restrict the key by HTTP referrer.
+- `VITE_TUTOR_API_URL` — optional tutor endpoint, defaults to `/api/tutor`.
+
+Server only (never use a `VITE_` prefix):
+- `GEMINI_API_KEY`
+- `FIREBASE_WEB_API_KEY` (or reuse the web API key on the server for token lookup)
+- `ALLOWED_ORIGINS`
 
 > Notes:
 > - Firebase values are consumed in `services/firebase.ts`.
-> - Gemini key is consumed in `services/geminiService.ts`.
-> - If Firebase keys are missing, app uses a safe dummy config to avoid crash (warning logged).
+> - The Gemini key is used only by `/api/tutor` (Vite middleware, Netlify function, or Vercel function).
+> - Missing Firebase env vars fail startup. Do not put secrets in `VITE_` variables.
 
 ## 3) GitHub deployment (GitHub Pages)
 
@@ -58,7 +59,8 @@ This repository now includes:
    - `VITE_FIREBASE_STORAGE_BUCKET`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
-   - `VITE_GEMINI_API_KEY`
+
+GitHub Pages cannot keep a Gemini key secret. Host `/api/tutor` on Netlify or Vercel and set `GEMINI_API_KEY` there. Optionally set `VITE_TUTOR_API_URL` to that URL.
 
 ### Expected site URL
 `https://<github-username>.github.io/E-Prayog/`

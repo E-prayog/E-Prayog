@@ -13,7 +13,9 @@ export type ActivityEventType =
   | 'teacher_code_generated'
   | 'admin_role_change'
   | 'new_teacher_registered'
-  | 'platform_feedback';
+  | 'platform_feedback'
+  | 'custom_quiz_updated'
+  | 'custom_quiz_reset';
 
 export interface ActivityEvent {
   id?: string;

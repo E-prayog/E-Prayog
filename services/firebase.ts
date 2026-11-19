@@ -12,28 +12,18 @@ import {
   orderBy, limit, arrayUnion,
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getClientEnv } from './env';
 
-// ── Firebase Config ────────────────────────────────────────────
+const env = getClientEnv();
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.replace(/"/g, ''),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.replace(/"/g, ''),
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID?.replace(/"/g, ''),
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.replace(/"/g, ''),
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.replace(/"/g, ''),
-  appId: import.meta.env.VITE_FIREBASE_APP_ID?.replace(/"/g, ''),
+  apiKey: env.VITE_FIREBASE_API_KEY.replace(/"/g, ''),
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN.replace(/"/g, ''),
+  projectId: env.VITE_FIREBASE_PROJECT_ID.replace(/"/g, ''),
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET.replace(/"/g, ''),
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID.replace(/"/g, ''),
+  appId: env.VITE_FIREBASE_APP_ID.replace(/"/g, ''),
 };
-
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === '""' || firebaseConfig.apiKey.includes('VITE_')) {
-  console.warn('Firebase keys missing. Using dummy config to prevent React crash.');
-  Object.assign(firebaseConfig, {
-    apiKey: 'dummy-api-key-to-prevent-crash',
-    authDomain: 'dummy.firebaseapp.com',
-    projectId: 'dummy-project',
-    storageBucket: 'dummy.appspot.com',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:web:abcdef123456',
-  });
-}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -145,6 +135,8 @@ export const recalculateProgress = async (uid: string, subjectId: string): Promi
 // ── Student Queries ────────────────────────────────────────────
 
 export const getStudentLabProgress = async (uid: string) => {
+  const current = auth.currentUser?.uid;
+  if (!current) throw new Error('Sign in required');
   const snap = await getDocs(collection(db, 'labProgress', uid, 'labs'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
@@ -178,14 +170,30 @@ export const resolveTeacherCode = async (code: string): Promise<{ uid: string; n
 };
 
 export const linkStudentToTeacher = async (studentUid: string, teacherUid: string, code: string, teacherName: string) => {
-  await updateDoc(doc(db, 'users', studentUid), { teacherUid, teacherCode: code });
+  if (auth.currentUser?.uid !== studentUid) {
+    throw new Error('You can only link your own account');
+  }
+  await updateDoc(doc(db, 'users', studentUid), {
+    teacherUid,
+    teacherCode: code,
+    teacherName,
+    updatedAt: new Date().toISOString(),
+  });
   await setDoc(doc(db, 'teachers', teacherUid, 'students', studentUid), {
     joinedAt: new Date().toISOString(), studentUid,
   }, { merge: true });
 };
 
 export const removeStudentFromClass = async (studentUid: string, teacherUid: string) => {
-  await updateDoc(doc(db, 'users', studentUid), { teacherUid: '', teacherCode: '' });
+  if (auth.currentUser?.uid !== studentUid && auth.currentUser?.uid !== teacherUid) {
+    throw new Error('Not allowed');
+  }
+  await updateDoc(doc(db, 'users', studentUid), {
+    teacherUid: '',
+    teacherCode: '',
+    teacherName: '',
+    updatedAt: new Date().toISOString(),
+  });
   try {
     await deleteDoc(doc(db, 'teachers', teacherUid, 'students', studentUid));
   } catch { /* ok if doesn't exist */ }
@@ -220,7 +228,11 @@ export const removeUser = async (uid: string) => {
 };
 
 export const updateUserData = async (uid: string, data: Partial<any>) => {
-  await updateDoc(doc(db, 'users', uid), { ...data, updatedAt: new Date().toISOString() });
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('You can only update your own profile');
+  }
+  const { role, teacherUid, teacherCode, classCode, class_code, ...rest } = data;
+  await updateDoc(doc(db, 'users', uid), { ...rest, updatedAt: new Date().toISOString() });
 };
 
 // ── Feedback ───────────────────────────────────────────────────
@@ -240,8 +252,14 @@ export const submitFeedback = async (uid: string, data: {
   name: string; email: string; role: string;
   category: string; message: string; rating: number;
 }) => {
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('Not allowed');
+  }
+  const { feedbackSchema } = await import('./validation');
+  const parsed = feedbackSchema.parse({ ...data, rating: Number(data.rating) });
   await addDoc(collection(db, 'feedbacks'), {
-    uid, ...data,
+    uid,
+    ...parsed,
     submittedAt: new Date().toISOString(),
     status: 'open',
   });
@@ -256,13 +274,7 @@ export const subscribeToPendingResets = (callback: (reqs: any[]) => void) => {
   }, err => console.warn('subscribeToPendingResets error:', err));
 };
 
-export const resolveResetRequest = async (requestId: string, teacherUid: string, newPassword: string) => {
-  // Store new password signal in Firestore (teacher's login page will pick it up)
-  await setDoc(doc(db, 'passwordResets', teacherUid), {
-    newPassword,
-    status: 'ready',
-    resolvedAt: new Date().toISOString(),
-  });
+export const resolveResetRequest = async (requestId: string) => {
   await updateDoc(doc(db, 'passwordResetRequests', requestId), {
     status: 'resolved',
     resolvedAt: new Date().toISOString(),
@@ -273,8 +285,11 @@ export const resolveResetRequest = async (requestId: string, teacherUid: string,
 
 export const logActivity = async (event: Record<string, any>): Promise<void> => {
   try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     await addDoc(collection(db, 'activityFeed'), {
       ...event,
+      actorUid: uid,
       timestamp: new Date().toISOString(),
     });
   } catch {
@@ -308,8 +323,13 @@ export const subscribeToTeacherActivity = (
 // ── File Upload ────────────────────────────────────────────────
 
 export const uploadProfilePhoto = async (uid: string, file: File): Promise<string> => {
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('You can only upload your own photo');
+  }
+  const { assertSafeImageFile } = await import('./validation');
+  assertSafeImageFile(file);
   const storageRef = ref(storage, `profilePhotos/${uid}`);
-  await uploadBytes(storageRef, file);
+  await uploadBytes(storageRef, file, { contentType: file.type });
   return getDownloadURL(storageRef);
 };
 
